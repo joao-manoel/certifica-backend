@@ -2,7 +2,7 @@
   "name": "certifica-backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/http/server.ts",
   "scripts": {
     "dev": "concurrently \"tsx watch --require tsconfig-paths/register src/http/server.ts\"",
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -12,9 +12,8 @@
     "build": "tsc && tsc-alias"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "author": "Joao-manoel",
+  "license": "MIT",
   "dependencies": {
     "@fastify/cors": "^11.1.0",
     "@fastify/jwt": "^10.0.0",
@@ -28,6 +27,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@prisma/client": "^6.18.0",
     "@types/node": "^24.9.1",
     "eslint": "^9.38.0",
     "eslint-config-prettier": "^10.1.8",
@@ -35,6 +35,8 @@
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^5.5.4",
     "prettier": "^3.6.2",
+    "prettier-plugin-prisma": "^5.0.0",
+    "prisma": "^6.18.0",
     "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.20.6",
