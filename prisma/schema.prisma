@@ -26,12 +26,14 @@ enum Visibility {
 }
 
 model User {
-  id         String    @id @default(uuid())
-  email      String    @unique
-  name       String
-  role       Role      @default(USER)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id        String   @id @default(uuid())
+  email     String?  @unique
+  username  String   @unique
+  name      String
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   Post Post[]
 
@@ -39,61 +41,60 @@ model User {
 }
 
 model Post {
-  id          String      @id @default(uuid())
-  authorId    String
-  author      User       @relation(fields: [authorId], references: [id])
+  id       String @id @default(uuid())
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
 
-  title      String
-  slug       String      @unique
-  excerpt    String?     @db.VarChar(300)
-  
-  content    Json
-  coverId    String?
-  cover      Media? @relation(fields: [coverId], references: [id])
+  title   String
+  slug    String  @unique
+  excerpt String? @db.VarChar(300)
 
-  status     PostStatus  @default(DRAFT)
-  visibility Visibility  @default(PUBLIC)
-  publishedAt DateTime?
+  content Json
+  coverId String?
+  cover   Media?  @relation(fields: [coverId], references: [id])
+
+  status       PostStatus @default(DRAFT)
+  visibility   Visibility @default(PUBLIC)
+  publishedAt  DateTime?
   scheduledFor DateTime?
 
-  wordCount Int         @default(0)
-  readTime  Int         @default(0) // in minutes
+  wordCount Int @default(0)
+  readTime  Int @default(0) // in minutes
 
-  categories   CategoryOnPosts[]
-  tags         TagOnPosts[]
-  comments     Comment[]
-  
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  categories CategoryOnPosts[]
+  tags       TagOnPosts[]
+  comments   Comment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status, publishedAt])
   @@index([publishedAt])
-  
   @@index([visibility])
 }
 
 model Media {
-  id          String   @id @default(uuid())
-  url         String   @db.VarChar(512)
-  alt         String?  @db.VarChar(200)
-  mimeType    String?  @db.VarChar(100)
+  id          String  @id @default(uuid())
+  url         String
+  alt         String? @db.VarChar(200)
+  mimeType    String? @db.VarChar(100)
   width       Int?
   height      Int?
-  dominantClr String?  @db.VarChar(12)
+  dominantClr String? @db.VarChar(12)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   Post Post[]
 }
 
 model Category {
-  id        String   @id @default(uuid())
+  id        String            @id @default(uuid())
   name      String
-  slug      String   @unique @db.Citext
+  slug      String            @unique
   posts     CategoryOnPosts[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 }
 
 model CategoryOnPosts {
@@ -101,43 +102,45 @@ model CategoryOnPosts {
   categoryId String
   post       Post     @relation(fields: [postId], references: [id])
   category   Category @relation(fields: [categoryId], references: [id])
+
   @@id([postId, categoryId])
 }
 
 model Tag {
-  id        String   @id @default(uuid())
+  id        String       @id @default(uuid())
   name      String
-  slug      String   @unique @db.Citext
+  slug      String       @unique
   posts     TagOnPosts[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 }
 
 model TagOnPosts {
   postId String
   tagId  String
-  post   Post @relation(fields: [postId], references: [id])
-  tag    Tag  @relation(fields: [tagId], references: [id])
+  post   Post   @relation(fields: [postId], references: [id])
+  tag    Tag    @relation(fields: [tagId], references: [id])
+
   @@id([postId, tagId])
 }
 
 model Comment {
-  id         String    @id @default(uuid())
-  postId     String
-  post       Post      @relation(fields: [postId], references: [id])
-  authorId   String?
-  author     User?     @relation(fields: [authorId], references: [id])
-  parentId   String?
-  parent     Comment?  @relation("CommentToComment", fields: [parentId], references: [id])
-  children   Comment[] @relation("CommentToComment")
+  id       String    @id @default(uuid())
+  postId   String
+  post     Post      @relation(fields: [postId], references: [id])
+  authorId String?
+  author   User?     @relation(fields: [authorId], references: [id])
+  parentId String?
+  parent   Comment?  @relation("CommentToComment", fields: [parentId], references: [id])
+  children Comment[] @relation("CommentToComment")
 
-  name       String?
-  email      String?   @db.Citext
-  content    String
+  name    String?
+  email   String?
+  content String
 
-  isApproved Boolean   @default(false)
-  isSpam     Boolean   @default(false)
+  isApproved Boolean @default(false)
+  isSpam     Boolean @default(false)
 
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
