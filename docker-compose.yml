@@ -20,6 +20,19 @@ services:
     volumes:
       - redis_data:/data
 
+  api:
+    build: .
+    container_name: certifica-api
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "3333:3333"
+
+    depends_on:
+      - postgres
+      - redis
+
 volumes:
   pgdata:
   redis_data:
