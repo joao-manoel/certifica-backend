@@ -6,15 +6,15 @@ dotenv.config()
 
 export const env = createEnv({
   server: {
-    PORT: z.number().default(3333),
-    API_URL: z.string().default("http://localhost:3333"),
+    PORT: z.number(),
+    API_URL: z.string(),
     API_KEY: z.string().min(1),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
     JWT_SECRET: z.string().min(1),
     REDIS_HOST: z.string().default("127.0.0.1"),
-    REDIS_PORT: z.coerce.number().default(6379),
+    REDIS_PORT: z.coerce.number().default(6380),
   },
   runtimeEnv: {
     PORT: process.env.PORT,
