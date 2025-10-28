@@ -14,7 +14,7 @@ export const env = createEnv({
       .default("development"),
     JWT_SECRET: z.string().min(1),
     REDIS_HOST: z.string().default("127.0.0.1"),
-    REDIS_PORT: z.coerce.number().default(6379),
+    REDIS_PORT: z.coerce.number().default(6380),
   },
   runtimeEnv: {
     PORT: process.env.PORT,
