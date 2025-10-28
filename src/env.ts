@@ -6,7 +6,7 @@ dotenv.config()
 
 export const env = createEnv({
   server: {
-    PORT: z.number(),
+    PORT: z.number().default(3333),
     API_URL: z.string(),
     API_KEY: z.string().min(1),
     NODE_ENV: z
