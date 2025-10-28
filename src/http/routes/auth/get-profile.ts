@@ -34,8 +34,6 @@ export async function getProfile(app: FastifyInstance) {
       async (request, reply) => {
         const userId = await request.getCurrentUserId()
 
-        console.log("Authenticated user ID:", userId)
-
         const user = await prisma.user.findUnique({
           select: {
             id: true,

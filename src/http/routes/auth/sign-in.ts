@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify"
 import type { ZodTypeProvider } from "fastify-type-provider-zod"
 import { z } from "zod"
+import bcrypt from "bcrypt"
 
 import { prisma } from "@/lib/prisma"
 import { UnauthorizedError } from "@/http/_errors/unauthorized-error"
@@ -30,11 +31,16 @@ export async function signIn(app: FastifyInstance) {
       const user = await prisma.user.findUnique({
         where: {
           username,
-          password,
         },
       })
 
       if (!user) {
+        throw new UnauthorizedError("username ou senha inválidos.")
+      }
+
+      const isValid = await bcrypt.compare(password, user.password)
+
+      if (!isValid) {
         throw new UnauthorizedError("username ou senha inválidos.")
       }
 
