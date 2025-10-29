@@ -9,7 +9,7 @@ datasource db {
 
 enum Role {
   ADMIN
-  MOD
+  EDITOR
   USER
 }
 
