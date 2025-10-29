@@ -44,7 +44,7 @@ export async function signIn(app: FastifyInstance) {
         throw new UnauthorizedError("username ou senha inválidos.")
       }
 
-      if (user.role !== Role.ADMIN && user.role !== Role.MOD) {
+      if (user.role !== Role.ADMIN && user.role !== Role.EDITOR) {
         throw new UnauthorizedError(
           "Você não tem permissão para acessar o sistema.",
         )
