@@ -76,7 +76,7 @@ model Post {
 model Media {
   id          String  @id @default(uuid())
   url         String
-  alt         String? @db.VarChar(200)
+  alt         String? @db.VarChar(500)
   mimeType    String? @db.VarChar(100)
   width       Int?
   height      Int?
