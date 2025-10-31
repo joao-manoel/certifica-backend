@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Media" ALTER COLUMN "alt" SET DATA TYPE VARCHAR(500);

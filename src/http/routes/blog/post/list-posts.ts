@@ -3,9 +3,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod"
 import { z } from "zod"
 
 import { prisma } from "@/lib/prisma"
-import { UnauthorizedError } from "@/http/_errors/unauthorized-error"
-import { auth } from "@/http/middlewares/auth"
-import { Role, PostStatus, Visibility } from "@prisma/client"
+import { PostStatus, Visibility } from "@prisma/client"
 import { isoOrNull } from "@/utils/blog-utils"
 
 export async function listPosts(app: FastifyInstance) {
@@ -18,9 +16,6 @@ export async function listPosts(app: FastifyInstance) {
         querystring: z.object({
           page: z.coerce.number().int().positive().default(1),
           pageSize: z.coerce.number().int().min(1).max(100).default(10),
-
-          status: z.nativeEnum(PostStatus).optional(),
-          visibility: z.nativeEnum(Visibility).optional(),
           authorId: z.string().uuid().optional(),
           category: z.string().optional(), // slug da categoria
           tag: z.string().optional(), // slug da tag
@@ -39,8 +34,6 @@ export async function listPosts(app: FastifyInstance) {
                 title: z.string(),
                 slug: z.string(),
                 excerpt: z.string().nullable(),
-                status: z.nativeEnum(PostStatus),
-                visibility: z.nativeEnum(Visibility),
                 publishedAt: z.string().datetime().nullable(),
                 scheduledFor: z.string().datetime().nullable(),
                 wordCount: z.number().int(),
@@ -77,31 +70,12 @@ export async function listPosts(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const userId = await request.getCurrentUserId()
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, role: true },
-      })
-
-      if (!user) throw new UnauthorizedError("Usuário não autenticado.")
-
-      const {
-        page,
-        pageSize,
-        status,
-        visibility,
-        authorId,
-        category,
-        tag,
-        orderBy,
-        orderDir,
-      } = request.query
+      const { page, pageSize, authorId, category, tag, orderBy, orderDir } =
+        request.query
 
       const skip = (page - 1) * pageSize
 
       const where: any = {}
-      if (status) where.status = status
-      if (visibility) where.visibility = visibility
       if (authorId) where.authorId = authorId
       if (category) {
         where.categories = {
@@ -114,11 +88,8 @@ export async function listPosts(app: FastifyInstance) {
         }
       }
 
-      // Usuário comum só enxerga PUBLISHED + PUBLIC
-      if (user.role === Role.USER) {
-        where.status = PostStatus.PUBLISHED
-        where.visibility = Visibility.PUBLIC
-      }
+      where.status = PostStatus.PUBLISHED
+      where.visibility = Visibility.PUBLIC
 
       const [total, items] = await prisma.$transaction([
         prisma.post.count({ where }),

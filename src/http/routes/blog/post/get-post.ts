@@ -3,10 +3,8 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod"
 import { z } from "zod"
 
 import { prisma } from "@/lib/prisma"
-import { UnauthorizedError } from "@/http/_errors/unauthorized-error"
 import { NotFoundError } from "@/http/_errors/not-found-error"
-import { auth } from "@/http/middlewares/auth"
-import { Role, PostStatus, Visibility } from "@prisma/client"
+import { PostStatus, Visibility } from "@prisma/client"
 import { isoOrNull } from "@/utils/blog-utils"
 
 export async function getPost(app: FastifyInstance) {
@@ -59,13 +57,6 @@ export async function getPost(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const userId = await request.getCurrentUserId()
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, role: true },
-      })
-      if (!user) throw new UnauthorizedError("Usuário não autenticado.")
-
       const { identifier } = request.params
 
       const isUUID =
@@ -73,7 +64,17 @@ export async function getPost(app: FastifyInstance) {
           identifier,
         )
 
-      const where = isUUID ? { id: identifier } : { slug: identifier }
+      const where = isUUID
+        ? {
+            id: identifier,
+            status: PostStatus.PUBLISHED,
+            visibility: Visibility.PUBLIC,
+          }
+        : {
+            slug: identifier,
+            status: PostStatus.PUBLISHED,
+            visibility: Visibility.PUBLIC,
+          }
 
       const post = await prisma.post.findFirst({
         where,
@@ -90,18 +91,6 @@ export async function getPost(app: FastifyInstance) {
       })
 
       if (!post) throw new NotFoundError("Post não encontrado.")
-
-      // restrição para USER: só vê PUBLIC + PUBLISHED
-      if (user.role === Role.USER) {
-        if (
-          post.status !== PostStatus.PUBLISHED ||
-          post.visibility !== Visibility.PUBLIC
-        ) {
-          throw new UnauthorizedError(
-            "Você não tem permissão para ver este post.",
-          )
-        }
-      }
 
       return reply.send({
         id: post.id,
