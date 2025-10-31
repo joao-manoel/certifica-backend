@@ -4,11 +4,11 @@ services:
     container_name: certifica-db
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: default
+      POSTGRES_USER: certifica7898
+      POSTGRES_PASSWORD: xGS2xyoFaPZhUKaSZS9grXJpu
       POSTGRES_DB: certifica
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -16,9 +16,22 @@ services:
     image: redis:alpine
     container_name: redis-certifica
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
+
+  certifica-api:
+    build: .
+    container_name: certifica-api
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "3334:3333"
+
+    depends_on:
+      - postgres
+      - redis
 
 volumes:
   pgdata:
