@@ -12,6 +12,7 @@ import { searchPosts } from "./blog/post/search-posts"
 import { getPost } from "./blog/post/get-post"
 import { deletePost } from "./blog/post/delete-post"
 import { adminListPost } from "./blog/post/admin/list-posts"
+import { getRelatedPosts } from "./blog/post/related-post"
 
 export async function routes(app: FastifyInstance) {
   //ROTA PARA AUTHENTICAÇÃO
@@ -30,6 +31,7 @@ export async function routes(app: FastifyInstance) {
   app.register(searchPosts)
   app.register(getPost)
   app.register(deletePost)
+  app.register(getRelatedPosts)
 
   //MEDIA
   app.register(createMedia)
