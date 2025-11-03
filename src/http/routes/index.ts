@@ -11,6 +11,7 @@ import { listPosts } from "./blog/post/list-posts"
 import { searchPosts } from "./blog/post/search-posts"
 import { getPost } from "./blog/post/get-post"
 import { deletePost } from "./blog/post/delete-post"
+import { adminListPost } from "./blog/post/admin/list-posts"
 
 export async function routes(app: FastifyInstance) {
   //ROTA PARA AUTHENTICAÇÃO
@@ -25,6 +26,7 @@ export async function routes(app: FastifyInstance) {
   //ROTA DO POST
   app.register(createPost)
   app.register(listPosts)
+  app.register(adminListPost)
   app.register(searchPosts)
   app.register(getPost)
   app.register(deletePost)

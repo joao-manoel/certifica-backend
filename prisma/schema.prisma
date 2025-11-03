@@ -35,15 +35,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  Post Post[]
-
-  Comment Comment[]
+  Post     Post[]
+  Comment  Comment[]
 }
 
 model Post {
   id       String @id @default(uuid())
   authorId String
-  author   User   @relation(fields: [authorId], references: [id])
+  author   User   @relation(fields: [authorId], references: [id]) // RESTRICT (default)
 
   title   String
   slug    String  @unique
@@ -51,7 +50,7 @@ model Post {
 
   content Json
   coverId String?
-  cover   Media?  @relation(fields: [coverId], references: [id])
+  cover   Media?  @relation(fields: [coverId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   status       PostStatus @default(DRAFT)
   visibility   Visibility @default(PUBLIC)
@@ -59,7 +58,7 @@ model Post {
   scheduledFor DateTime?
 
   wordCount Int @default(0)
-  readTime  Int @default(0) // in minutes
+  readTime  Int @default(0) // minutes
 
   categories CategoryOnPosts[]
   tags       TagOnPosts[]
@@ -100,8 +99,9 @@ model Category {
 model CategoryOnPosts {
   postId     String
   categoryId String
-  post       Post     @relation(fields: [postId], references: [id])
-  category   Category @relation(fields: [categoryId], references: [id])
+
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@id([postId, categoryId])
 }
@@ -118,8 +118,9 @@ model Tag {
 model TagOnPosts {
   postId String
   tagId  String
-  post   Post   @relation(fields: [postId], references: [id])
-  tag    Tag    @relation(fields: [tagId], references: [id])
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@id([postId, tagId])
 }
@@ -127,11 +128,13 @@ model TagOnPosts {
 model Comment {
   id       String    @id @default(uuid())
   postId   String
-  post     Post      @relation(fields: [postId], references: [id])
+  post     Post      @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
   authorId String?
-  author   User?     @relation(fields: [authorId], references: [id])
+  author   User?     @relation(fields: [authorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
   parentId String?
-  parent   Comment?  @relation("CommentToComment", fields: [parentId], references: [id])
+  parent   Comment?  @relation("CommentToComment", fields: [parentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   children Comment[] @relation("CommentToComment")
 
   name    String?

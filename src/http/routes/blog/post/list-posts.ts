@@ -48,7 +48,6 @@ export async function listPosts(app: FastifyInstance) {
                   username: z.string(),
                 }),
 
-                // >>> adicionados:
                 categories: z.array(
                   z.object({
                     id: z.string().uuid(),
