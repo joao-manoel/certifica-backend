@@ -118,21 +118,10 @@ export default {
     for (const queue of this.queues) {
       queue.bull.process(async (job: Job) => {
         const start = performance.now()
-        console.log(
-          chalk.greenBright(
-            `[Queue] ▶️ Job iniciado [${queue.name}] id=${job.id}`,
-          ),
-        )
-        console.log(chalk.gray(`       Payload:`), job.data)
 
         try {
           await queue.handle(job)
           const duration = (performance.now() - start).toFixed(1)
-          console.log(
-            chalk.greenBright(
-              `[Queue] ✅ Job concluído [${queue.name}] id=${job.id} (${duration}ms)`,
-            ),
-          )
         } catch (err) {
           console.error(
             chalk.redBright(
@@ -149,12 +138,6 @@ export default {
         )
         console.error("Data:", job.data)
         console.error("Erro:", err)
-      })
-
-      queue.bull.on("completed", (job: Job) => {
-        console.log(
-          chalk.green(`[Queue] 🏁 Job finalizado [${queue.name}] id=${job.id}`),
-        )
       })
 
       queue.bull.on("ready", () => {
