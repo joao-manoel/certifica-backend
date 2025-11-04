@@ -16,6 +16,10 @@ import { getRelatedPosts } from "./blog/post/related-post"
 import { editPost } from "./blog/post/admin/edit-post"
 import { getPostById } from "./blog/post/admin/get-post-by-id"
 import { trackPostView } from "./blog/post/track-post-view"
+import { createUtmEvent } from "./analytics/utm/create-utm-event"
+import { createUtmCampaign } from "./analytics/utm/create-utm-campaign"
+import { createUtmMedium } from "./analytics/utm/create-utm-medium"
+import { createUtmSource } from "./analytics/utm/create-utm-source"
 
 export async function routes(app: FastifyInstance) {
   //ROTA PARA AUTHENTICAÇÃO
@@ -38,6 +42,12 @@ export async function routes(app: FastifyInstance) {
   app.register(trackPostView)
   app.register(editPost)
   app.register(getPostById)
+
+  //ANALYTICS
+  app.register(createUtmEvent)
+  app.register(createUtmCampaign)
+  app.register(createUtmMedium)
+  app.register(createUtmSource)
 
   //MEDIA
   app.register(createMedia)

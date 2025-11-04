@@ -112,29 +112,57 @@ model PostView {
   @@index([createdAt])
 }
 
-model Utm {
+model UtmEvent {
   id String @id @default(uuid())
 
-  // campos UTM padrão
-  source   String? @db.VarChar(100) // ex: "google", "instagram", "newsletter"
-  medium   String? @db.VarChar(100) // ex: "cpc", "organic", "email"
-  campaign String? @db.VarChar(150) // ex: "black_friday", "launch_2025"
-  term     String? @db.VarChar(150) // ex: palavra-chave paga: "engenharia sustentável"
-  content  String? @db.VarChar(150) // ex: "banner_a", "cta_footer"
+  // snapshot dos valores recebidos (crus)
+  source   String? @db.VarChar(100)
+  medium   String? @db.VarChar(100)
+  campaign String? @db.VarChar(150)
+  term     String? @db.VarChar(150)
+  content  String? @db.VarChar(150)
 
-  // dados técnicos e de origem
-  referrer   String? @db.VarChar(300) // ex: URL completa do site que originou a sessão
-  landingUrl String? @db.VarChar(400) // ex: página de destino (URL onde clicou)
-  device     String? @db.VarChar(30) // ex: "mobile", "desktop", "tablet"
+  // dimensões normalizadas (FKs)
+  sourceId   String?
+  mediumId   String?
+  campaignId String?
+
+  sourceDim   UtmSource?   @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  mediumDim   UtmMedium?   @relation(fields: [mediumId], references: [id], onDelete: SetNull)
+  campaignDim UtmCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  referrer   String? @db.VarChar(300)
+  landingUrl String? @db.VarChar(400)
+  device     String? @db.VarChar(30)
   browser    String? @db.VarChar(30)
   os         String? @db.VarChar(30)
-  country    String? @db.VarChar(2) // ISO code: "BR", "US"
+  country    String? @db.VarChar(2)
 
-  // tempo
   capturedAt DateTime @default(now())
 
-  @@index([source, medium, campaign])
   @@index([capturedAt])
+  @@index([sourceId, mediumId, campaignId])
+}
+
+model UtmSource {
+  id       String     @id @default(uuid())
+  slug     String     @unique @db.VarChar(120) // ex: "facebook", "x", "whatsapp"
+  name     String     @db.VarChar(120)
+  UtmEvent UtmEvent[]
+}
+
+model UtmMedium {
+  id       String     @id @default(uuid())
+  slug     String     @unique @db.VarChar(120) // ex: "social", "cpc", "email"
+  name     String     @db.VarChar(120)
+  UtmEvent UtmEvent[]
+}
+
+model UtmCampaign {
+  id       String     @id @default(uuid())
+  slug     String     @unique @db.VarChar(160) // ex: "post_share", "bf_2025"
+  name     String     @db.VarChar(160)
+  UtmEvent UtmEvent[]
 }
 
 model Media {
