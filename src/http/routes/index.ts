@@ -4,15 +4,17 @@ import { getProfile } from "./auth/get-profile"
 import { signUp } from "./auth/sign-up"
 import { updateUser } from "./user/update-user"
 import { updateUserPassword } from "./user/update-user-password"
-import { createPost } from "./blog/post/create-post"
+import { createPost } from "./blog/post/admin/create-post"
 import { createMedia } from "./blog/media/create-media"
 import { listMedia } from "./blog/media/list-media"
 import { listPosts } from "./blog/post/list-posts"
 import { searchPosts } from "./blog/post/search-posts"
 import { getPost } from "./blog/post/get-post"
-import { deletePost } from "./blog/post/delete-post"
+import { deletePost } from "./blog/post/admin/delete-post"
 import { adminListPost } from "./blog/post/admin/list-posts"
 import { getRelatedPosts } from "./blog/post/related-post"
+import { editPost } from "./blog/post/admin/edit-post"
+import { getPostById } from "./blog/post/admin/get-post-by-id"
 
 export async function routes(app: FastifyInstance) {
   //ROTA PARA AUTHENTICAÇÃO
@@ -32,6 +34,8 @@ export async function routes(app: FastifyInstance) {
   app.register(getPost)
   app.register(deletePost)
   app.register(getRelatedPosts)
+  app.register(editPost)
+  app.register(getPostById)
 
   //MEDIA
   app.register(createMedia)

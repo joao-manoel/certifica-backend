@@ -38,7 +38,6 @@ export async function deletePost(app: FastifyInstance) {
       async (request, reply) => {
         const userId = await request.getCurrentUserId()
 
-        // carrega role do usuário autenticado
         const me = await prisma.user.findUnique({
           where: { id: userId },
           select: { id: true, role: true },
@@ -57,7 +56,6 @@ export async function deletePost(app: FastifyInstance) {
 
         const { id } = request.params
 
-        // existe?
         const post = await prisma.post.findUnique({
           where: { id },
           select: { id: true, authorId: true },
