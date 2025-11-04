@@ -65,13 +65,6 @@ export async function searchPosts(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const userId = await request.getCurrentUserId()
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, role: true },
-      })
-      if (!user) throw new UnauthorizedError("Usuário não autenticado.")
-
       const {
         q,
         page,
@@ -92,14 +85,8 @@ export async function searchPosts(app: FastifyInstance) {
         AND: [],
       }
 
-      // restrição de papel: USER só vê publicados e públicos
-      if (user.role === Role.USER) {
-        where.AND.push({ status: PostStatus.PUBLISHED })
-        where.AND.push({ visibility: Visibility.PUBLIC })
-      } else {
-        if (status) where.AND.push({ status })
-        if (visibility) where.AND.push({ visibility })
-      }
+      where.AND.push({ status: PostStatus.PUBLISHED })
+      where.AND.push({ visibility: Visibility.PUBLIC })
 
       if (authorId) where.AND.push({ authorId })
 
