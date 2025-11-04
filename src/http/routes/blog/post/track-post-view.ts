@@ -58,8 +58,6 @@ export async function trackPostView(app: FastifyInstance) {
         return reply.code(204).send() // ignora bots
       }
 
-      console.log(`Tracking view for post "${slug}"`)
-
       // busca post
       const post = await prisma.post.findUnique({
         where: { slug },

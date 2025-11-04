@@ -12,6 +12,8 @@ import { redis } from "@/lib/redis"
 async function scanPendingKeys(pattern = "pv:pending:*", count = 200) {
   let cursor = "0"
   const keys: string[] = []
+  console.log(`[FlushPostViews] 🧭 Iniciando SCAN no Redis...`)
+
   do {
     const [nextCursor, batch] = (await redis.scan(
       cursor,
@@ -21,15 +23,28 @@ async function scanPendingKeys(pattern = "pv:pending:*", count = 200) {
       count,
     )) as [string, string[]]
     cursor = nextCursor
-    if (batch && batch.length) keys.push(...batch)
+    if (batch && batch.length) {
+      keys.push(...batch)
+      console.log(
+        `[FlushPostViews] Encontradas ${batch.length} chaves (total até agora: ${keys.length})`,
+      )
+    }
   } while (cursor !== "0")
+
+  console.log(
+    `[FlushPostViews] SCAN concluído. Total de chaves: ${keys.length}`,
+  )
   return keys
 }
 
 async function applyChunk(
   chunk: Array<{ key: string; postId: string; val: number }>,
 ) {
-  // aplica no banco e apaga as chaves no Redis
+  console.log(
+    `[FlushPostViews] 🧩 Aplicando chunk de ${chunk.length} posts no banco...`,
+  )
+
+  const start = performance.now()
   await prisma.$transaction(
     chunk.map((item) =>
       prisma.post.update({
@@ -39,9 +54,17 @@ async function applyChunk(
       }),
     ),
   )
+
+  const duration = performance.now() - start
+  console.log(
+    `[FlushPostViews] ✅ ${chunk.length} posts atualizados no banco (${duration.toFixed(1)}ms)`,
+  )
+
   const pipeline = redis.pipeline()
   chunk.forEach((item) => pipeline.del(item.key))
   await pipeline.exec()
+
+  console.log(`[FlushPostViews] 🧹 Chaves removidas do Redis.`)
 }
 
 export interface FlushPostViewsData {
@@ -56,32 +79,68 @@ export default {
     repeat: { cron: "*/10 * * * *" }, // a cada 10 minutos
     removeOnComplete: true,
     removeOnFail: 50,
-    // opcional: limitar concorrência a 1 em process()
   },
 
   async handle(_job: Job<FlushPostViewsData>) {
-    const keys = await scanPendingKeys()
-    if (keys.length === 0) return
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    console.log(
+      `[FlushPostViews] 🚀 Job iniciado às ${new Date().toISOString()}`,
+    )
 
-    // mget em lote
-    const vals = await redis.mget(...keys)
-    const toApply: Array<{ key: string; postId: string; val: number }> = []
-    keys.forEach((key, i) => {
-      const raw = vals[i]
-      const n = raw ? Number(raw) : 0
-      if (Number.isFinite(n) && n > 0) {
-        const postId = key.split(":")[2] // pv:pending:<postId>
-        if (postId) toApply.push({ key, postId, val: n })
+    const t0 = performance.now()
+
+    try {
+      const keys = await scanPendingKeys()
+      if (keys.length === 0) {
+        console.log("[FlushPostViews] ⚪ Nenhuma pendência encontrada.")
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        return
       }
-    })
 
-    if (toApply.length === 0) return
+      console.log(
+        `[FlushPostViews] 🔢 Lendo valores das ${keys.length} chaves...`,
+      )
+      const vals = await redis.mget(...keys)
+      const toApply: Array<{ key: string; postId: string; val: number }> = []
 
-    // processa em chunks p/ evitar transações enormes
-    const CHUNK_SIZE = 100
-    for (let i = 0; i < toApply.length; i += CHUNK_SIZE) {
-      const chunk = toApply.slice(i, i + CHUNK_SIZE)
-      await applyChunk(chunk)
+      keys.forEach((key, i) => {
+        const raw = vals[i]
+        const n = raw ? Number(raw) : 0
+        if (Number.isFinite(n) && n > 0) {
+          const postId = key.split(":")[2] // pv:pending:<postId>
+          if (postId) toApply.push({ key, postId, val: n })
+        }
+      })
+
+      if (toApply.length === 0) {
+        console.log(
+          "[FlushPostViews] ⚪ Nenhuma chave com valor válido encontrada.",
+        )
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        return
+      }
+
+      console.log(
+        `[FlushPostViews] 🧮 Serão aplicadas ${toApply.length} atualizações (views).`,
+      )
+
+      const CHUNK_SIZE = 100
+      for (let i = 0; i < toApply.length; i += CHUNK_SIZE) {
+        const chunk = toApply.slice(i, i + CHUNK_SIZE)
+        console.log(
+          `[FlushPostViews] 🔄 Processando chunk ${i / CHUNK_SIZE + 1}/${Math.ceil(
+            toApply.length / CHUNK_SIZE,
+          )}`,
+        )
+        await applyChunk(chunk)
+      }
+
+      const elapsed = (performance.now() - t0).toFixed(0)
+      console.log(`[FlushPostViews] 🎯 Job concluído em ${elapsed}ms`)
+    } catch (err) {
+      console.error("[FlushPostViews] ❌ Erro durante execução:", err)
+    } finally {
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     }
   },
 }
