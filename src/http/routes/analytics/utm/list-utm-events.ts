@@ -14,21 +14,17 @@ export async function listUtmEvents(app: FastifyInstance) {
       schema: {
         tags: ["Analytics"],
         summary:
-          "Lista eventos UTM por sourceName/campaignName (ou retorna apenas o count)",
-        querystring: z
-          .object({
-            sourceName: z.string().trim().min(1).optional(),
-            campaignName: z.string().trim().min(1).optional(),
-            page: z.coerce.number().int().positive().default(1),
-            perPage: z.coerce.number().int().min(1).max(100).default(20),
-            countOnly: z
-              .union([z.literal("true"), z.literal("false")])
-              .default("false")
-              .transform((v) => v === "true"),
-          })
-          .refine((q) => q.sourceName || q.campaignName, {
-            message: "Informe ao menos sourceName ou campaignName",
-          }),
+          "Lista eventos UTM (opcionalmente filtrando por sourceName/campaignName) ou retorna apenas o count",
+        querystring: z.object({
+          sourceName: z.string().trim().min(1).optional(),
+          campaignName: z.string().trim().min(1).optional(),
+          page: z.coerce.number().int().positive().default(1),
+          perPage: z.coerce.number().int().min(1).max(100).default(20),
+          countOnly: z
+            .union([z.literal("true"), z.literal("false")])
+            .default("false")
+            .transform((v) => v === "true"),
+        }),
         response: {
           200: z.union([
             z.object({ count: z.number().int().nonnegative() }),
@@ -63,10 +59,10 @@ export async function listUtmEvents(app: FastifyInstance) {
       const { sourceName, campaignName, page, perPage, countOnly } =
         request.query
 
-      // Resolve nomes -> IDs via slug
       let sourceId: string | undefined
       let campaignId: string | undefined
 
+      // Resolve nomes -> IDs via slug (caso fornecidos)
       if (sourceName) {
         const src = await prisma.utmSource.findUnique({
           where: { slug: slugify(sourceName) },
@@ -85,19 +81,14 @@ export async function listUtmEvents(app: FastifyInstance) {
         campaignId = camp.id
       }
 
-      // Filtro base
-      const base: Prisma.UtmEventWhereInput =
-        sourceId && campaignId
-          ? { AND: [{ sourceId }, { campaignId }] }
-          : sourceId
-            ? { sourceId }
-            : { campaignId: campaignId! }
+      // Monta o filtro dinamicamente
+      let where: Prisma.UtmEventWhereInput = {}
+      if (sourceId && campaignId)
+        where = { AND: [{ sourceId }, { campaignId }] }
+      else if (sourceId) where = { sourceId }
+      else if (campaignId) where = { campaignId }
 
-      // Aplica período, se houver
-      const where: Prisma.UtmEventWhereInput = {
-        ...base,
-      }
-
+      // Count apenas
       if (countOnly) {
         const count = await prisma.utmEvent.count({ where })
         return reply.code(200).send({ count })
@@ -134,7 +125,6 @@ export async function listUtmEvents(app: FastifyInstance) {
         total,
         items: items.map((i) => ({
           id: i.id,
-          // se o client do Prisma insiste em '| null', garantimos não-nulo:
           sourceId: i.sourceId as string,
           mediumId: i.mediumId as string,
           campaignId: i.campaignId as string,
