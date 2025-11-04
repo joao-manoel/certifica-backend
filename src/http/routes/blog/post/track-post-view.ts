@@ -4,29 +4,8 @@ import { z } from "zod"
 
 import { prisma } from "@/lib/prisma"
 import { redis } from "@/lib/redis"
-import { PostStatus, Visibility } from "@prisma/client"
-
-function isBot(ua: string | undefined) {
-  const s = (ua ?? "").toLowerCase()
-  if (!s) return false
-  return (
-    s.includes("bot") ||
-    s.includes("spider") ||
-    s.includes("crawler") ||
-    s.includes("preview") ||
-    s.includes("fetch") ||
-    s.includes("monitoring") ||
-    s.includes("headless") ||
-    s.includes("pingdom")
-  )
-}
-
-function yyyymmdd(d = new Date()) {
-  const y = d.getUTCFullYear()
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0")
-  const day = String(d.getUTCDate()).padStart(2, "0")
-  return `${y}${m}${day}`
-}
+import { PostStatus, ViewStatus, Visibility } from "@prisma/client"
+import { hashIp, isBotUA, parseClientHints, yyyymmdd } from "@/utils/metrics"
 
 export async function trackPostView(app: FastifyInstance) {
   app.withTypeProvider<ZodTypeProvider>().post(
@@ -34,31 +13,33 @@ export async function trackPostView(app: FastifyInstance) {
     {
       schema: {
         tags: ["Posts"],
-        summary: "Track a post view (dedup per day)",
-        params: z.object({
-          slug: z.string().min(1),
-        }),
+        summary: "Track a post view (DB first, Redis dedupe) — sem UTM",
+        params: z.object({ slug: z.string().min(1) }),
         body: z
           .object({
-            // fingerprint opcional vindo do client; se ausente, caímos no fallback fraco (UA+IP+dia)
-            fp: z.string().min(16).max(128).optional(),
+            fp: z.string().min(16).max(128).optional(), // fingerprint diário do client
+            path: z.string().max(200).optional(), // caminho da página (opcional)
           })
           .optional(),
-        response: {
-          204: z.null(),
-        },
+        response: { 204: z.null() },
       },
     },
     async (request, reply) => {
       const { slug } = request.params
-      const fpFromBody = request.body?.fp
+      const body = request.body ?? {}
 
-      const ua = request.headers["user-agent"]
-      if (isBot(ua)) {
-        return reply.code(204).send() // ignora bots
-      }
+      // headers/client info
+      const ua = (request.headers["user-agent"] as string) ?? ""
+      const referrer =
+        (request.headers["referer"] as string) ||
+        (request.headers["referrer"] as string) ||
+        undefined
+      const ipHeader = (request.headers["x-forwarded-for"] as string)
+        ?.split(",")[0]
+        ?.trim()
+      const ip = ipHeader || request.ip || "0.0.0.0"
 
-      // busca post
+      // valida post elegível
       const post = await prisma.post.findUnique({
         where: { slug },
         select: { id: true, status: true, visibility: true },
@@ -71,39 +52,58 @@ export async function trackPostView(app: FastifyInstance) {
         return reply.code(204).send()
       }
 
-      // fingerprint
-      // prioridade: body.fp (hash de sessionId+UA+dia gerado no client)
-      // fallback (fraco): ip truncado + UA + dia
-      let fp = fpFromBody
-      if (!fp) {
-        const ip =
-          (request.headers["x-forwarded-for"] as string)
-            ?.split(",")[0]
-            ?.trim() ||
-          request.ip ||
-          "0.0.0.0"
-        const ipTrunc = ip.split(".").slice(0, 3).join(".") // privacidade básica
-        fp = `${ipTrunc}:${(ua ?? "").slice(0, 80)}:${yyyymmdd()}`
+      const day = yyyymmdd()
+      const ipH = hashIp(ip)
+      const bot = isBotUA(ua)
+      const { device, browser, os } = parseClientHints(ua)
+
+      // 1) cria PostView como PENDING (grava metadados básicos)
+      const view = await prisma.postView.create({
+        data: {
+          postId: post.id,
+          status: ViewStatus.PENDING,
+          day,
+          ipHash: ipH,
+          ua: ua.slice(0, 300),
+          referrer: referrer?.slice(0, 300),
+          path: body.path?.slice(0, 200),
+          fingerprint: body.fp,
+          isBot: bot,
+          device,
+          browser,
+          os,
+        },
+        select: { id: true },
+      })
+
+      // 2) bots não contam: apaga a view e finaliza
+      if (bot) {
+        await prisma.postView.delete({ where: { id: view.id } })
+        return reply.code(204).send()
       }
 
-      const day = yyyymmdd()
+      // 3) dedupe diária no Redis
+      const fpKeyPart =
+        body.fp && body.fp.length >= 16 ? body.fp : `${ipH}:${day}`
       const setKey = `pv:u:${post.id}:${day}`
       const pendingKey = `pv:pending:${post.id}`
-      const hitsKey = `pv:hits:${post.id}:${day}`
 
-      // add ao SET diário; se 1 → primeira vez hoje
-      const added = await redis.sadd(setKey, fp)
-      // garante TTL de 2 dias no SET diário
-      await redis.expire(setKey, 60 * 60 * 24 * 2)
+      try {
+        const added = await redis.sadd(setKey, fpKeyPart)
+        await redis.expire(setKey, 60 * 60 * 24 * 2)
 
-      // opcional: contar hits crus do dia (sem dedupe) p/ debug
-      await redis.incrby(hitsKey, 1)
-      await redis.expire(hitsKey, 60 * 60 * 24 * 3)
-
-      if (added === 1) {
-        await redis.incrby(pendingKey, 1)
-        // manter pending por ~1 semana; flush deve limpar
-        await redis.expire(pendingKey, 60 * 60 * 24 * 7)
+        if (added === 1) {
+          // primeira vez hoje → conta
+          await redis.incrby(pendingKey, 1)
+          await redis.expire(pendingKey, 60 * 60 * 24 * 7)
+          // mantém a PostView PENDING para o flush marcar APPLIED
+        } else {
+          // duplicata → apaga a PostView recém-criada
+          await prisma.postView.delete({ where: { id: view.id } })
+        }
+      } catch {
+        // erro de Redis → apaga a PostView (evita órfãos)
+        await prisma.postView.delete({ where: { id: view.id } })
       }
 
       return reply.code(204).send()

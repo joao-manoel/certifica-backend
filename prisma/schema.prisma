@@ -35,8 +35,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  Post     Post[]
-  Comment  Comment[]
+  Post    Post[]
+  Comment Comment[]
 }
 
 model Post {
@@ -69,9 +69,72 @@ model Post {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  PostView PostView[]
+
   @@index([status, publishedAt])
   @@index([publishedAt])
   @@index([visibility])
+}
+
+enum ViewStatus {
+  PENDING // criada e aguardando flush
+  APPLIED // consolida
+  DISCARDED // descartada (bot/duplicata/falha)
+}
+
+model PostView {
+  id     String @id @default(uuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  status ViewStatus @default(PENDING)
+
+  // Observáveis/atributos
+  day         String  @db.VarChar(8) // yyyymmdd (UTC), útil p/ agregações
+  ipHash      String? @db.VarChar(64) // SHA-256 do IP truncado + pepper
+  ua          String? @db.VarChar(300)
+  referrer    String? @db.VarChar(300)
+  path        String? @db.VarChar(200)
+  fingerprint String? @db.VarChar(64)
+
+  // heurísticas
+  isBot   Boolean @default(false)
+  country String? @db.VarChar(2) // opcional se resolver geoloc no futuro
+  device  String? @db.VarChar(30) // "mobile/desktop/tablet" (heurística)
+  browser String? @db.VarChar(30)
+  os      String? @db.VarChar(30)
+
+  @@index([postId, status])
+  @@index([postId, day, status])
+  @@index([createdAt])
+}
+
+model Utm {
+  id String @id @default(uuid())
+
+  // campos UTM padrão
+  source   String? @db.VarChar(100) // ex: "google", "instagram", "newsletter"
+  medium   String? @db.VarChar(100) // ex: "cpc", "organic", "email"
+  campaign String? @db.VarChar(150) // ex: "black_friday", "launch_2025"
+  term     String? @db.VarChar(150) // ex: palavra-chave paga: "engenharia sustentável"
+  content  String? @db.VarChar(150) // ex: "banner_a", "cta_footer"
+
+  // dados técnicos e de origem
+  referrer   String? @db.VarChar(300) // ex: URL completa do site que originou a sessão
+  landingUrl String? @db.VarChar(400) // ex: página de destino (URL onde clicou)
+  device     String? @db.VarChar(30) // ex: "mobile", "desktop", "tablet"
+  browser    String? @db.VarChar(30)
+  os         String? @db.VarChar(30)
+  country    String? @db.VarChar(2) // ISO code: "BR", "US"
+
+  // tempo
+  capturedAt DateTime @default(now())
+
+  @@index([source, medium, campaign])
+  @@index([capturedAt])
 }
 
 model Media {
@@ -102,8 +165,8 @@ model CategoryOnPosts {
   postId     String
   categoryId String
 
-  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  post     Post     @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@id([postId, categoryId])
 }
@@ -128,12 +191,12 @@ model TagOnPosts {
 }
 
 model Comment {
-  id       String    @id @default(uuid())
-  postId   String
-  post     Post      @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  id     String @id @default(uuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   authorId String?
-  author   User?     @relation(fields: [authorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  author   User?   @relation(fields: [authorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   parentId String?
   parent   Comment?  @relation("CommentToComment", fields: [parentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
