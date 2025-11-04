@@ -52,8 +52,6 @@ export async function trackPostView(app: FastifyInstance) {
         return reply.code(204).send()
       }
 
-      console.log("Tracking view for post:", slug, "from IP:", ip)
-
       const day = yyyymmdd()
       const ipH = hashIp(ip)
       const bot = isBotUA(ua)
@@ -77,8 +75,6 @@ export async function trackPostView(app: FastifyInstance) {
         },
         select: { id: true },
       })
-
-      console.log("Created PostView:", view.id, "Bot:", bot)
 
       // 2) bots não contam: apaga a view e finaliza
       if (bot) {
