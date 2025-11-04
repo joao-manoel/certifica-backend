@@ -76,9 +76,10 @@ export default {
 
   // rode a cada 10 min. Ajuste se precisar.
   options: {
-    repeat: { cron: "*/10 * * * *" }, // a cada 10 minutos
+    repeat: { cron: "*/1 * * * *" }, // a cada 10 minutos
     removeOnComplete: true,
     removeOnFail: 50,
+    limiter: { max: 1, duration: 60000 }, // só 1 execução por minuto
   },
 
   async handle(_job: Job<FlushPostViewsData>) {
