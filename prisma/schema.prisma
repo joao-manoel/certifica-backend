@@ -57,6 +57,8 @@ model Post {
   publishedAt  DateTime?
   scheduledFor DateTime?
 
+  views Int @default(0)
+
   wordCount Int @default(0)
   readTime  Int @default(0) // minutes
 

@@ -15,6 +15,8 @@ export const env = createEnv({
     JWT_SECRET: z.string().min(1),
     REDIS_HOST: z.string().default("127.0.0.1"),
     REDIS_PORT: z.coerce.number().default(6380),
+    NODEMAILER_USER: z.string().min(1),
+    NODEMAILER_PASSWORD: z.string().min(1),
   },
   runtimeEnv: {
     PORT: process.env.PORT,
@@ -25,5 +27,7 @@ export const env = createEnv({
     FAMILY_STORAGE_PATH: process.env.FAMILY_STORAGE_PATH,
     API_URL: process.env.API_URL,
     API_KEY: process.env.API_KEY,
+    NODEMAILER_USER: process.env.NODEMAILER_USER,
+    NODEMAILER_PASSWORD: process.env.NODEMAILER_PASSWORD,
   },
 })

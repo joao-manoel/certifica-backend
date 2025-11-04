@@ -13,6 +13,7 @@ import { getPost } from "./blog/post/get-post"
 import { deletePost } from "./blog/post/delete-post"
 import { adminListPost } from "./blog/post/admin/list-posts"
 import { getRelatedPosts } from "./blog/post/related-post"
+import { trackPostView } from "./blog/post/track-post-view"
 
 export async function routes(app: FastifyInstance) {
   //ROTA PARA AUTHENTICAÇÃO
@@ -32,6 +33,7 @@ export async function routes(app: FastifyInstance) {
   app.register(getPost)
   app.register(deletePost)
   app.register(getRelatedPosts)
+  app.register(trackPostView)
 
   //MEDIA
   app.register(createMedia)

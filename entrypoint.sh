@@ -4,4 +4,5 @@
 npx prisma migrate deploy
 
 npx concurrently \
-  "node dist/http/server.js"
+  "node dist/http/server.js" \
+  "node dist/queue/queue.js"
