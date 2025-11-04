@@ -20,6 +20,7 @@ import { createUtmEvent } from "./analytics/utm/create-utm-event"
 import { createUtmCampaign } from "./analytics/utm/create-utm-campaign"
 import { createUtmMedium } from "./analytics/utm/create-utm-medium"
 import { createUtmSource } from "./analytics/utm/create-utm-source"
+import { listUtmEvents } from "./analytics/utm/list-utm-events"
 
 export async function routes(app: FastifyInstance) {
   //ROTA PARA AUTHENTICAÇÃO
@@ -48,6 +49,7 @@ export async function routes(app: FastifyInstance) {
   app.register(createUtmCampaign)
   app.register(createUtmMedium)
   app.register(createUtmSource)
+  app.register(listUtmEvents)
 
   //MEDIA
   app.register(createMedia)
