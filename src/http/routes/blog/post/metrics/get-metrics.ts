@@ -6,11 +6,7 @@ import { prisma } from "@/lib/prisma"
 import { UnauthorizedError } from "@/http/_errors/unauthorized-error"
 import { auth } from "@/http/middlewares/auth"
 import { Role, PostStatus, ViewStatus } from "@prisma/client"
-import {
-  getMonthBoundaries,
-  last30DaysUTC,
-  pctDelta,
-} from "@/utils/metrics-utils"
+import { getMonthBoundaries, pctDelta } from "@/utils/metrics-utils"
 
 export async function getMetrics(app: FastifyInstance) {
   app
@@ -22,11 +18,9 @@ export async function getMetrics(app: FastifyInstance) {
         schema: {
           tags: ["Metrics"],
           summary:
-            "Métricas consolidadas para o dashboard (cards + série diária + engajamento + top posts)",
+            "Métricas do mês atual para o dashboard (posts, views, engajamento e top posts)",
           response: {
             200: z.object({
-              totalPublished: z.number().int().nonnegative(),
-
               monthlyPublished: z.object({
                 value: z.number().int().nonnegative(),
                 prev: z.number().int().nonnegative(),
@@ -41,7 +35,6 @@ export async function getMetrics(app: FastifyInstance) {
 
               growthRateMonthly: z.number(),
 
-              // NOVO: série diária últimos 30 dias
               viewsDaily: z.array(
                 z.object({
                   day: z.string(), // yyyyMMdd
@@ -49,7 +42,6 @@ export async function getMetrics(app: FastifyInstance) {
                 }),
               ),
 
-              // NOVO: engajamento/comportamento
               engagement: z.object({
                 devices: z.array(
                   z.object({
@@ -83,7 +75,6 @@ export async function getMetrics(app: FastifyInstance) {
                 ),
               }),
 
-              // NOVO: top posts por views (últimos 30 dias)
               topPosts: z.array(
                 z.object({
                   postId: z.string(),
@@ -98,50 +89,39 @@ export async function getMetrics(app: FastifyInstance) {
       },
       async (request, reply) => {
         const userId = await request.getCurrentUserId()
-
         const user = await prisma.user.findUnique({
           where: { id: userId },
           select: { id: true, role: true },
         })
 
         if (!user) throw new UnauthorizedError("Usuário não autenticado.")
-        if (user.role !== Role.ADMIN && user.role !== Role.EDITOR) {
+        if (user.role !== Role.ADMIN && user.role !== Role.EDITOR)
           throw new UnauthorizedError(
             "Você não tem permissão para consultar métricas.",
           )
-        }
 
         const { monthStart, nextMonthStart, prevMonthStart, prevMonthEnd } =
           getMonthBoundaries(new Date())
-        const {
-          days,
-          start: last30Start,
-          end: last30End,
-        } = last30DaysUTC(new Date())
 
-        // ---- Cards principais (como você já tinha) ----
-        const [
-          totalPublished,
-          publishedThisMonth,
-          publishedPrevMonth,
-          viewsThisMonth,
-          viewsPrevMonth,
-        ] = await prisma.$transaction([
-          prisma.post.count({
-            where: { status: PostStatus.PUBLISHED },
-          }),
-          prisma.post.count({
-            where: {
-              status: PostStatus.PUBLISHED,
-              publishedAt: { gte: monthStart, lt: nextMonthStart },
-            },
-          }),
-          prisma.post.count({
-            where: {
-              status: PostStatus.PUBLISHED,
-              publishedAt: { gte: prevMonthStart, lt: prevMonthEnd },
-            },
-          }),
+        // 1️⃣ POSTS PUBLICADOS — mês atual e anterior
+        const [publishedThisMonth, publishedPrevMonth] =
+          await prisma.$transaction([
+            prisma.post.count({
+              where: {
+                status: PostStatus.PUBLISHED,
+                publishedAt: { gte: monthStart, lt: nextMonthStart },
+              },
+            }),
+            prisma.post.count({
+              where: {
+                status: PostStatus.PUBLISHED,
+                publishedAt: { gte: prevMonthStart, lt: prevMonthEnd },
+              },
+            }),
+          ])
+
+        // 2️⃣ VISUALIZAÇÕES — mês atual e anterior
+        const [viewsThisMonth, viewsPrevMonth] = await prisma.$transaction([
           prisma.postView.count({
             where: {
               status: ViewStatus.APPLIED,
@@ -158,39 +138,31 @@ export async function getMetrics(app: FastifyInstance) {
 
         const publishedMoM = pctDelta(publishedThisMonth, publishedPrevMonth)
         const viewsMoM = pctDelta(viewsThisMonth, viewsPrevMonth)
-        const growthRateMonthly = viewsMoM // pode trocar por publishedMoM se preferir
+        const growthRateMonthly = viewsMoM
 
-        // ---- Views por dia (últimos 30 dias) ----
-        // Usamos o campo 'day' (yyyyMMdd) indexado + filtro de janela por createdAt para consistência.
+        // 3️⃣ VISUALIZAÇÕES POR DIA (apenas mês atual)
         const byDay = await prisma.postView.groupBy({
           by: ["day"],
           where: {
             status: ViewStatus.APPLIED,
-            createdAt: { gte: last30Start, lt: last30End },
+            createdAt: { gte: monthStart, lt: nextMonthStart },
           },
           _count: { _all: true },
         })
 
-        const dayToCount = new Map<string, number>()
-        for (const row of byDay) {
-          dayToCount.set(row.day, row._count._all)
-        }
-        const viewsDaily = days.map((d) => ({
-          day: d,
-          value: dayToCount.get(d) ?? 0,
-        }))
+        const viewsDaily = byDay
+          .map((r) => ({ day: r.day, value: r._count._all }))
+          .sort((a, b) => a.day.localeCompare(b.day))
 
-        // ---- Engajamento (últimos 30 dias) ----
-        // Top N por dimensão (pode ajustar o N conforme necessidade)
+        // 4️⃣ ENGAJAMENTO (mês atual)
         const TOP_N = 6
-
         const [gDevices, gBrowsers, gOS, gCountries, gReferrers] =
           await Promise.all([
             prisma.postView.groupBy({
               by: ["device"],
               where: {
                 status: ViewStatus.APPLIED,
-                createdAt: { gte: last30Start, lt: last30End },
+                createdAt: { gte: monthStart, lt: nextMonthStart },
               },
               _count: { _all: true },
               orderBy: { _count: { id: "desc" } },
@@ -200,7 +172,7 @@ export async function getMetrics(app: FastifyInstance) {
               by: ["browser"],
               where: {
                 status: ViewStatus.APPLIED,
-                createdAt: { gte: last30Start, lt: last30End },
+                createdAt: { gte: monthStart, lt: nextMonthStart },
               },
               _count: { _all: true },
               orderBy: { _count: { id: "desc" } },
@@ -210,7 +182,7 @@ export async function getMetrics(app: FastifyInstance) {
               by: ["os"],
               where: {
                 status: ViewStatus.APPLIED,
-                createdAt: { gte: last30Start, lt: last30End },
+                createdAt: { gte: monthStart, lt: nextMonthStart },
               },
               _count: { _all: true },
               orderBy: { _count: { id: "desc" } },
@@ -220,7 +192,7 @@ export async function getMetrics(app: FastifyInstance) {
               by: ["country"],
               where: {
                 status: ViewStatus.APPLIED,
-                createdAt: { gte: last30Start, lt: last30End },
+                createdAt: { gte: monthStart, lt: nextMonthStart },
               },
               _count: { _all: true },
               orderBy: { _count: { id: "desc" } },
@@ -230,7 +202,7 @@ export async function getMetrics(app: FastifyInstance) {
               by: ["referrer"],
               where: {
                 status: ViewStatus.APPLIED,
-                createdAt: { gte: last30Start, lt: last30End },
+                createdAt: { gte: monthStart, lt: nextMonthStart },
               },
               _count: { _all: true },
               orderBy: { _count: { id: "desc" } },
@@ -258,16 +230,16 @@ export async function getMetrics(app: FastifyInstance) {
           })),
         }
 
-        // ---- Top posts por views (últimos 30 dias) ----
+        // 5️⃣ TOP POSTS DO MÊS (por views)
         const topViews = await prisma.postView.groupBy({
           by: ["postId"],
           where: {
             status: ViewStatus.APPLIED,
-            createdAt: { gte: last30Start, lt: last30End },
+            createdAt: { gte: monthStart, lt: nextMonthStart },
           },
           _count: { _all: true },
           orderBy: { _count: { id: "desc" } },
-          take: 5, // ajuste conforme o que quer exibir
+          take: 5,
         })
 
         const postIds = topViews.map((t) => t.postId)
@@ -282,18 +254,18 @@ export async function getMetrics(app: FastifyInstance) {
         const topPosts = topViews
           .map((t) => {
             const p = postMap.get(t.postId)
-            if (!p) return null
-            return {
-              postId: p.id,
-              title: p.title,
-              slug: p.slug,
-              views: t._count._all,
-            }
+            return p
+              ? {
+                  postId: p.id,
+                  title: p.title,
+                  slug: p.slug,
+                  views: t._count._all,
+                }
+              : null
           })
           .filter((x): x is NonNullable<typeof x> => Boolean(x))
 
         return reply.send({
-          totalPublished,
           monthlyPublished: {
             value: publishedThisMonth,
             prev: publishedPrevMonth,
@@ -305,7 +277,6 @@ export async function getMetrics(app: FastifyInstance) {
             momDeltaPct: Number(viewsMoM.toFixed(2)),
           },
           growthRateMonthly: Number(growthRateMonthly.toFixed(2)),
-
           viewsDaily,
           engagement,
           topPosts,
