@@ -33,7 +33,7 @@ export const errorHandler: FastifyErrorHandler = (error, request, reply) => {
     })
   }
 
-  console.error(error)
+  // console.error(error)
 
   // send error to some observability platform
 
