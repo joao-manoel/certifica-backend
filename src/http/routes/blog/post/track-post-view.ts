@@ -5,7 +5,12 @@ import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { redis } from "@/lib/redis"
 import { PostStatus, ViewStatus, Visibility } from "@prisma/client"
-import { hashIp, isBotUA, parseClientHints, yyyymmdd } from "@/utils/metrics"
+import {
+  hashIp,
+  isBotUA,
+  parseClientHints,
+  yyyymmdd,
+} from "@/utils/metrics-utils"
 
 export async function trackPostView(app: FastifyInstance) {
   app.withTypeProvider<ZodTypeProvider>().post(
