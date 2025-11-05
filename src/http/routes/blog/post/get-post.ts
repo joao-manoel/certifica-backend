@@ -60,8 +60,6 @@ export async function getPost(app: FastifyInstance) {
     async (request, reply) => {
       const { identifier } = request.params
 
-      console.log("Fetching post with identifier:", identifier)
-
       const isUUID =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
           identifier,
