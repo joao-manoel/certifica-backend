@@ -140,19 +140,38 @@ export async function getMetrics(app: FastifyInstance) {
         const viewsMoM = pctDelta(viewsThisMonth, viewsPrevMonth)
         const growthRateMonthly = viewsMoM
 
-        // 3️⃣ VISUALIZAÇÕES POR DIA (apenas mês atual)
-        const byDay = await prisma.postView.groupBy({
-          by: ["day"],
-          where: {
-            status: ViewStatus.APPLIED,
-            createdAt: { gte: monthStart, lt: nextMonthStart },
-          },
-          _count: { _all: true },
-        })
+        type RawDaily = { day: string; count: number }
 
-        const viewsDaily = byDay
-          .map((r) => ({ day: r.day, value: r._count._all }))
-          .sort((a, b) => a.day.localeCompare(b.day))
+        const rawDaily = await prisma.$queryRaw<RawDaily[]>`
+          WITH days AS (
+            SELECT generate_series(
+              date_trunc('month', ${monthStart}::timestamptz),
+              date_trunc('month', ${nextMonthStart}::timestamptz) - interval '1 day',
+              interval '1 day'
+            )::date AS d
+          ),
+          agg AS (
+            SELECT
+              ("createdAt" AT TIME ZONE 'UTC')::date AS d,
+              COUNT(*)::int AS c
+            FROM "PostView"
+            WHERE "status" = ${ViewStatus.APPLIED}
+              AND "createdAt" >= ${monthStart}
+              AND "createdAt" < ${nextMonthStart}
+            GROUP BY 1
+          )
+          SELECT
+            to_char(days.d, 'YYYYMMDD') AS day,
+            COALESCE(agg.c, 0) AS count
+          FROM days
+          LEFT JOIN agg ON agg.d = days.d
+          ORDER BY days.d;
+        `
+
+        const viewsDaily = rawDaily.map((r) => ({
+          day: r.day, // yyyyMMdd
+          value: Number(r.count),
+        }))
 
         // 4️⃣ ENGAJAMENTO (mês atual)
         const TOP_N = 6
