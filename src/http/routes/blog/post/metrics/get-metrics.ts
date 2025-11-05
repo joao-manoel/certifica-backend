@@ -144,30 +144,30 @@ export async function getMetrics(app: FastifyInstance) {
         type RawDaily = { day: string; count: number }
 
         const rawDaily = await prisma.$queryRaw<RawDaily[]>`
-  WITH days AS (
-    SELECT generate_series(
-      date_trunc('month', ${monthStart}::timestamptz),
-      date_trunc('month', ${nextMonthStart}::timestamptz) - interval '1 day',
-      interval '1 day'
-    )::date AS d
-  ),
-  agg AS (
-    SELECT
-      ("createdAt" AT TIME ZONE 'UTC')::date AS d,
-      COUNT(*)::int AS c
-    FROM "PostView"
-    WHERE "status" = CAST(${ViewStatus.APPLIED} AS "ViewStatus")   -- 👈 CAST no enum
-      AND "createdAt" >= ${monthStart}
-      AND "createdAt" < ${nextMonthStart}
-    GROUP BY 1
-  )
-  SELECT
-    to_char(days.d, 'YYYYMMDD') AS day,
-    COALESCE(agg.c, 0) AS count
-  FROM days
-  LEFT JOIN agg ON agg.d = days.d
-  ORDER BY days.d;
-`
+          WITH days AS (
+            SELECT generate_series(
+              date_trunc('month', ${monthStart}::timestamptz),
+              date_trunc('month', ${nextMonthStart}::timestamptz) - interval '1 day',
+              interval '1 day'
+            )::date AS d
+          ),
+          agg AS (
+            SELECT
+              ("createdAt" AT TIME ZONE 'UTC')::date AS d,
+              COUNT(*)::int AS c
+            FROM "PostView"
+            WHERE "status" = CAST(${ViewStatus.APPLIED} AS "ViewStatus")   -- 👈 CAST no enum
+              AND "createdAt" >= ${monthStart}
+              AND "createdAt" < ${nextMonthStart}
+            GROUP BY 1
+          )
+          SELECT
+            to_char(days.d, 'YYYYMMDD') AS day,
+            COALESCE(agg.c, 0) AS count
+          FROM days
+          LEFT JOIN agg ON agg.d = days.d
+          ORDER BY days.d;
+        `
 
         const viewsDaily = rawDaily.map((r) => ({
           day: r.day, // yyyyMMdd

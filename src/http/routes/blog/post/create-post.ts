@@ -108,15 +108,23 @@ export async function createPost(app: FastifyInstance) {
         let scheduledAt: Date | null = null
 
         if (status === PostStatus.SCHEDULED) {
-          if (!scheduledFor)
+          if (!scheduledFor) {
             throw new BadRequestError(
               "Posts agendados requerem 'scheduledFor'.",
             )
+          }
           const when = new Date(scheduledFor)
-          if (Number.isNaN(when.getTime()))
+          if (Number.isNaN(when.getTime())) {
             throw new BadRequestError("'scheduledFor' inválido.")
-          if (when <= new Date())
+          }
+          const now = new Date()
+          if (when <= now) {
             throw new BadRequestError("'scheduledFor' deve ser no futuro.")
+          }
+
+          // (opcional) truncar ms:
+          when.setMilliseconds(0)
+
           scheduledAt = when
         }
 

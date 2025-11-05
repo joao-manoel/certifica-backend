@@ -74,6 +74,7 @@ model Post {
   @@index([status, publishedAt])
   @@index([publishedAt])
   @@index([visibility])
+  @@index([status, scheduledFor])
 }
 
 enum ViewStatus {
