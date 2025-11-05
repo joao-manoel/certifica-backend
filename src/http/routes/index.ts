@@ -22,6 +22,7 @@ import { createUtmMedium } from "./analytics/utm/create-utm-medium"
 import { createUtmSource } from "./analytics/utm/create-utm-source"
 import { listUtmEvents } from "./analytics/utm/list-utm-events"
 import { getPostStats } from "./blog/post/metrics/get-post-stats"
+import { getMetrics } from "./blog/post/metrics/get-metrics"
 
 export async function routes(app: FastifyInstance) {
   //ROTA PARA AUTHENTICAÇÃO
@@ -40,13 +41,15 @@ export async function routes(app: FastifyInstance) {
   app.register(deletePost)
   app.register(editPost)
   app.register(getPostById)
-
+  //rotas publicas
   app.register(listPublicPosts)
   app.register(searchPosts)
   app.register(getPost)
   app.register(getRelatedPosts)
   app.register(trackPostView)
+  //metricas
   app.register(getPostStats)
+  app.register(getMetrics)
 
   //ANALYTICS
   app.register(createUtmEvent)

@@ -12,7 +12,7 @@ export async function getPostStats(app: FastifyInstance) {
     .withTypeProvider<ZodTypeProvider>()
     .register(auth)
     .get(
-      "/blog/posts/stats",
+      "/blog/metrics/posts/stats",
       {
         schema: {
           tags: ["Posts"],
