@@ -1,5 +1,7 @@
 import { initializeTracing } from "@/lib/tracing"
-initializeTracing()
+if (env.NODE_ENV === "production") {
+  initializeTracing()
+}
 import fastifyJwt from "@fastify/jwt"
 import fastify from "fastify"
 import {
