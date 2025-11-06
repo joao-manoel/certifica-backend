@@ -1,4 +1,3 @@
-// lib/tracing.ts
 import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api"
 import { NodeSDK } from "@opentelemetry/sdk-node"
 import { Resource } from "@opentelemetry/resources"
@@ -15,7 +14,6 @@ const sdk = new NodeSDK({
     [S.SERVICE_NAME]: "certifica-api",
   }),
   traceExporter: new OTLPTraceExporter({
-    // use HTTP 4318 com path /v1/traces
     url:
       env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://otel-collector:4318/v1/traces",
   }),
