@@ -35,6 +35,12 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  description String?  @db.VarChar(500)
+
+  avatarKey        String?  @db.VarChar(300) 
+  avatarMime       String?  @db.VarChar(100)
+  avatarUpdatedAt  DateTime?
+
   Post    Post[]
   Comment Comment[]
 }

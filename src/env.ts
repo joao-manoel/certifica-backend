@@ -18,6 +18,11 @@ export const env = createEnv({
     NODEMAILER_USER: z.string().min(1),
     NODEMAILER_PASSWORD: z.string().min(1),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().min(1),
+    S3_BUCKET_NAME: z.string().min(1),
+    S3_REGION: z.string().min(1),
+    S3_ACCESS_KEY_ID: z.string().min(1),
+    S3_SECRET_ACCESS_KEY: z.string().min(1),
+    S3_BASE_URL: z.string().min(1),
   },
   runtimeEnv: {
     PORT: process.env.PORT,
@@ -31,5 +36,10 @@ export const env = createEnv({
     NODEMAILER_USER: process.env.NODEMAILER_USER,
     NODEMAILER_PASSWORD: process.env.NODEMAILER_PASSWORD,
     OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
+    S3_REGION: process.env.S3_REGION,
+    S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
+    S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
+    S3_BASE_URL: process.env.S3_BASE_URL,
   },
 })

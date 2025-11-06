@@ -32,6 +32,7 @@ export async function updateUser(app: FastifyInstance) {
                 .regex(/^[a-zA-Z0-9._-]+$/, "username inválido")
                 .optional(),
               email: z.string().email().optional(),
+              description: z.string().min(1).max(500).optional(),
               role: z.nativeEnum(Role).optional(),
             })
             .transform((data) => ({
@@ -53,6 +54,7 @@ export async function updateUser(app: FastifyInstance) {
               name: z.string().nullable(),
               email: z.string().email().nullable(),
               role: z.nativeEnum(Role),
+              description: z.string().nullable(),
               createdAt: z.date(),
               updatedAt: z.date(),
             }),
@@ -75,7 +77,7 @@ export async function updateUser(app: FastifyInstance) {
           )
         }
 
-        const { name, role, username, email } = request.body
+        const { name, role, username, email, description } = request.body
 
         const user = await prisma.user.findUnique({ where: { id } })
         if (!user) {
@@ -118,12 +120,15 @@ export async function updateUser(app: FastifyInstance) {
           username?: string
           email?: string
           role?: Role
+          description?: string
         } = {}
 
         if (typeof name !== "undefined") dataToUpdate.name = name
         if (typeof username !== "undefined") dataToUpdate.username = username
         if (typeof email !== "undefined") dataToUpdate.email = email
         if (typeof role !== "undefined") dataToUpdate.role = role
+        if (typeof description !== "undefined")
+          dataToUpdate.description = description
 
         const updatedUser = await prisma.user.update({
           where: { id: user.id },

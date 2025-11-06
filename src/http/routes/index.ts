@@ -2,8 +2,8 @@ import { FastifyInstance } from "fastify"
 import { signIn } from "./auth/sign-in"
 import { getProfile } from "./auth/get-profile"
 import { signUp } from "./auth/sign-up"
-import { updateUser } from "./user/update-user"
-import { updateUserPassword } from "./user/update-user-password"
+import { updateUser } from "./users/update-user"
+import { updateUserPassword } from "./users/update-user-password"
 import { createPost } from "./blog/post/create-post"
 import { createMedia } from "./blog/media/create-media"
 import { listMedia } from "./blog/media/list-media"
@@ -23,6 +23,8 @@ import { createUtmSource } from "./analytics/utm/create-utm-source"
 import { listUtmEvents } from "./analytics/utm/list-utm-events"
 import { getPostStats } from "./blog/post/metrics/get-post-stats"
 import { getMetrics } from "./blog/post/metrics/get-metrics"
+import { setAvatar } from "./users/set-avatar"
+import { getUserAvatarByUsername } from "./users/get-user-avatar-by-username"
 
 export async function routes(app: FastifyInstance) {
   //ROTA PARA AUTHENTICAÇÃO
@@ -33,6 +35,8 @@ export async function routes(app: FastifyInstance) {
   //ROTAS DO USER
   app.register(updateUser)
   app.register(updateUserPassword)
+  app.register(setAvatar)
+  app.register(getUserAvatarByUsername)
 
   //ROTA DO POST
   //rota privadas
