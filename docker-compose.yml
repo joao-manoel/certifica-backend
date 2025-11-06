@@ -1,16 +1,7 @@
-version: "3.9"
-
-networks:
-  appnet: {} # <— declara a rede
-
-volumes:
-  pgdata:
-  redis_data:
-
 services:
   postgres:
     image: postgres:15
-    # container_name: certifica-db   # evite container_name no dev (DNS mais estável)
+    container_name: certifica-db
     restart: always
     environment:
       POSTGRES_USER: certifica7898
@@ -20,66 +11,53 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-    networks: [appnet]
 
   redis:
     image: redis:alpine
-    # container_name: redis-certifica
+    container_name: redis-certifica
     ports:
       - "6380:6379"
     volumes:
       - redis_data:/data
-    networks: [appnet]
+
+  certifica-api:
+    build: .
+    container_name: certifica-api
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "3334:3333"
+    depends_on:
+      - postgres
+      - redis
+      - otel-collector
 
   jaeger:
     image: jaegertracing/all-in-one:latest
-    # container_name: jaeger
+    container_name: jaeger
     ports:
       - "8081:16686" # Jaeger UI
-      - "14268" # HTTP ingest (opcional)
-      - "14250" # gRPC ingest do coletor
-    networks: [appnet]
+      - "14268"
+      - "14250"
 
   otel-collector:
     image: otel/opentelemetry-collector:latest
-    # container_name: otel-collector
+    container_name: otel-collector
     command: ["--config=/etc/otel-collector-config.yml"]
     volumes:
       - ./otel-collector-config.yml:/etc/otel-collector-config.yml
     ports:
-      - "1888:1888" # pprof
-      - "13133:13133" # health_check
-      - "4317:4317" # OTLP gRPC
-      - "4318:4318" # OTLP HTTP
-      - "55679:55679" # zpages
+      - "1888:1888" # pprof extension
+      - "13133:13133" # health_check extension
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # http gRPC receiver
+      - "55679:55679" # zpages extension
     depends_on:
-      jaeger:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:13133/"]
-      interval: 5s
-      timeout: 2s
-      retries: 20
-    networks: [appnet]
+      - jaeger
+    links:
+      - jaeger
 
-  certifica-api:
-    build: .
-    # container_name: certifica-api
-    restart: always
-    env_file:
-      - .env
-    environment:
-      # se for usar HTTP exporter:
-      # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
-      # se for usar gRPC exporter:
-      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
-    ports:
-      - "3334:3333"
-    depends_on:
-      postgres:
-        condition: service_started
-      redis:
-        condition: service_started
-      otel-collector:
-        condition: service_healthy
-    networks: [appnet]
+volumes:
+  pgdata:
+  redis_data:
