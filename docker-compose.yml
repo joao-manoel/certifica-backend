@@ -12,7 +12,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data"
+      - pgdata:/var/lib/postgresql/data
 
   redis:
     image: redis:alpine
@@ -68,12 +68,6 @@ services:
     restart: always
     env_file:
       - .env
-    environment:
-      # Exporta TRACES por HTTP para o Collector (evita TLS em gRPC)
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
-      # Se quiser, ajuste DB/Redis para containers:
-      # DATABASE_URL: postgresql://certifica7898:xGS2xyoFaPZhUKaSZS9grXJpu@postgres:5432/certifica
-      # REDIS_HOST: redis
     ports:
       - "3334:3333"
     depends_on:
