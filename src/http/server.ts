@@ -1,5 +1,3 @@
-import { initializeTracing } from "@/lib/tracing"
-initializeTracing()
 import fastifyJwt from "@fastify/jwt"
 import fastify from "fastify"
 import {
