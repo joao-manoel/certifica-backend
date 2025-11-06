@@ -32,6 +32,7 @@ services:
       - postgres
       - redis
       - otel-collector
+    networks: [appnet]
 
   jaeger:
     image: jaegertracing/all-in-one:latest
@@ -57,6 +58,7 @@ services:
       - jaeger
     links:
       - jaeger
+    networks: [appnet]
 
 volumes:
   pgdata:
