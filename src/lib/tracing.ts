@@ -14,8 +14,7 @@ const sdk = new NodeSDK({
     [S.SERVICE_NAME]: "certifica-api",
   }),
   traceExporter: new OTLPTraceExporter({
-    url:
-      env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://otel-collector:4318/v1/traces",
+    url: env.OTEL_EXPORTER_OTLP_ENDPOINT,
   }),
   instrumentations: [new HttpInstrumentation(), new PrismaInstrumentation()],
 })

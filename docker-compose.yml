@@ -1,5 +1,8 @@
 version: "3.9"
 
+networks:
+  appnet: {}
+
 services:
   postgres:
     image: postgres:15
@@ -35,6 +38,7 @@ services:
       - "8081:16686" # UI
       - "14250:14250" # gRPC ingest (collector -> jaeger)
     restart: unless-stopped
+    networks: [appnet]
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
@@ -50,6 +54,7 @@ services:
     depends_on:
       - jaeger
     restart: unless-stopped
+    networks: [appnet]
 
   prometheus:
     image: prom/prometheus:latest
@@ -61,6 +66,7 @@ services:
     depends_on:
       - otel-collector
     restart: unless-stopped
+    networks: [appnet]
 
   certifica-api:
     build: .
@@ -74,6 +80,7 @@ services:
       - postgres
       - redis
       - otel-collector
+    networks: [appnet]
 
 volumes:
   pgdata:
