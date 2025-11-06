@@ -39,7 +39,7 @@ export async function getPost(app: FastifyInstance) {
               name: z.string(),
               username: z.string(),
               bio: z.string().nullable(),
-              hashAvatar: z.boolean(),
+              hasAvatar: z.boolean(),
             }),
             coverUrl: z.string().nullable(),
             categories: z.array(
@@ -124,7 +124,7 @@ export async function getPost(app: FastifyInstance) {
           name: post.author.name,
           username: post.author.username,
           bio: post.author.description,
-          hashAvatar: !!post.author.avatarKey,
+          hasAvatar: !!post.author.avatarKey,
         },
         coverUrl: post.cover?.url ?? null,
         categories: post.categories.map((c) => ({
