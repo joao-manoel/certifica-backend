@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { initializeTracing } from "@/lib/tracing"
 if (env.NODE_ENV === "production") {
   initializeTracing()
@@ -10,7 +11,7 @@ import {
   type ZodTypeProvider,
 } from "fastify-type-provider-zod"
 import { errorHandler } from "@/http/error-handle"
-import { env } from "@/env"
+
 import { routes } from "@/http/routes"
 import fastifyMultipart, {
   type FastifyMultipartOptions,
