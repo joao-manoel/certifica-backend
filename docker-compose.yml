@@ -28,7 +28,7 @@ services:
     environment:
       # Jaeger vai ler métricas no Prometheus
       METRICS_STORAGE_TYPE: prometheus
-      PROMETHEUS_SERVER_URL: http://prometheus:9090
+      PROMETHEUS_SERVER_URL: http://prometheus:9091
       # Suporte ao conector de spanmetrics (nome/labels esperados)
       PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR: "true"
     ports:
