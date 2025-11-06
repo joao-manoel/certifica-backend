@@ -33,25 +33,54 @@ async function scanPendingKeys(pattern = "pv:pending:*", count = 200) {
 async function applyChunk(
   chunk: Array<{ key: string; postId: string; val: number }>,
 ) {
-  // Transação única para:
-  // 1) Incrementar Post.views
-  // 2) Marcar N PostView como APPLIED (FIFO) por post
+  // 0) saneamento: ignora val <= 0 e chaves malformadas
+  const clean = chunk.filter(
+    (it) => it.val > 0 && it.postId && typeof it.postId === "string",
+  )
+
+  // 1) busca quais posts existem
+  const ids = [...new Set(clean.map((i) => i.postId))]
+  const existing = await prisma.post.findMany({
+    where: { id: { in: ids } },
+    select: { id: true },
+  })
+  const existingSet = new Set(existing.map((p) => p.id))
+
+  const valid = clean.filter((i) => existingSet.has(i.postId))
+  const missing = clean.filter((i) => !existingSet.has(i.postId))
+
+  // 2) trata os "órfãos" FORA da transação principal: limpa Redis e marca PostView
+  if (missing.length) {
+    // limpa as chaves órfãs
+    const pipe = redis.pipeline()
+    missing.forEach((m) => pipe.del(m.key))
+    await pipe.exec()
+
+    // opcional: marque PostView órfão como CANCELLED/ORPHANED (ou simplesmente delete)
+    await prisma.postView.updateMany({
+      where: {
+        postId: { in: missing.map((m) => m.postId) },
+        status: "PENDING",
+      },
+      data: { status: "DISCARDED", processedAt: new Date() },
+    })
+  }
+
+  if (!valid.length) return
+
+  // 3) transação: incrementa views e aplica PostView
   await prisma.$transaction(async (tx) => {
-    // 1) incrementos em lote
-    await Promise.all(
-      chunk.map((item) =>
-        tx.post.update({
-          where: { id: item.postId },
-          data: { views: { increment: item.val } },
-          select: { id: true },
-        }),
-      ),
-    )
+    // 3.1) incrementos individualizados, MAS só para IDs válidos
+    for (const item of valid) {
+      await tx.post.update({
+        where: { id: item.postId },
+        data: { views: { increment: item.val } },
+        select: { id: true },
+      })
+    }
 
-    // 2) sincroniza N linhas PENDING -> APPLIED por post
-    for (const item of chunk) {
-      if (item.val <= 0) continue
-
+    // 3.2) sincroniza N PENDING -> APPLIED por post
+    for (const item of valid) {
       const pendingRows = await tx.postView.findMany({
         where: { postId: item.postId, status: "PENDING" },
         orderBy: { createdAt: "asc" },
@@ -65,17 +94,13 @@ async function applyChunk(
           data: { status: "APPLIED", processedAt: new Date() },
         })
       }
-      // Obs: se houver menos PENDING que o 'val', aplicamos o que existe.
-      // O resto fica "faltando" no Redis — mas como apagaremos a chave,
-      // a diferença não será reaplicada. Em prática, esse cenário só ocorre
-      // se houve expiração/limpeza de PostView antes do flush.
     }
   })
 
-  // 3) limpa as chaves pendentes no Redis
-  const pipeline = redis.pipeline()
-  chunk.forEach((item) => pipeline.del(item.key))
-  await pipeline.exec()
+  // 4) limpa as chaves pendentes (apenas as válidas)
+  const pipe2 = redis.pipeline()
+  valid.forEach((i) => pipe2.del(i.key))
+  await pipe2.exec()
 }
 
 export interface FlushPostViewsData {
