@@ -37,6 +37,7 @@ export async function getPost(app: FastifyInstance) {
               id: z.string().uuid(),
               name: z.string(),
               username: z.string(),
+              bio: z.string().nullable(),
             }),
             coverUrl: z.string().nullable(),
             categories: z.array(
@@ -80,7 +81,9 @@ export async function getPost(app: FastifyInstance) {
       const post = await prisma.post.findFirst({
         where,
         include: {
-          author: { select: { id: true, name: true, username: true } },
+          author: {
+            select: { id: true, name: true, username: true, description: true },
+          },
           cover: { select: { url: true } },
           categories: {
             include: { category: true },
@@ -108,7 +111,12 @@ export async function getPost(app: FastifyInstance) {
         readTime: post.readTime,
         createdAt: post.createdAt.toISOString(),
         updatedAt: post.updatedAt.toISOString(),
-        author: post.author,
+        author: {
+          id: post.author.id,
+          name: post.author.name,
+          username: post.author.username,
+          bio: post.author.description,
+        },
         coverUrl: post.cover?.url ?? null,
         categories: post.categories.map((c) => ({
           id: c.category.id,
