@@ -31,6 +31,7 @@ services:
     depends_on:
       - postgres
       - redis
+      - otel-collector
 
   jaeger:
     image: jaegertracing/all-in-one:latest
