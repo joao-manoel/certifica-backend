@@ -47,6 +47,8 @@ export async function listPublicPosts(app: FastifyInstance) {
                   id: z.string().uuid(),
                   name: z.string(),
                   username: z.string(),
+                  hasAvatar: z.boolean(),
+                  bio: z.string().nullable(),
                 }),
 
                 categories: z.array(
@@ -113,7 +115,15 @@ export async function listPublicPosts(app: FastifyInstance) {
             createdAt: true,
             updatedAt: true,
 
-            author: { select: { id: true, name: true, username: true } },
+            author: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatarKey: true,
+                description: true,
+              },
+            },
             cover: { select: { url: true } },
 
             // >>> inclui ponte e entidade para projetar depois
@@ -150,7 +160,13 @@ export async function listPublicPosts(app: FastifyInstance) {
           coverUrl: p.cover?.url ?? null,
           createdAt: p.createdAt.toISOString(),
           updatedAt: p.updatedAt.toISOString(),
-          author: p.author,
+          author: {
+            id: p.author.id,
+            name: p.author.name,
+            username: p.author.username,
+            hasAvatar: !!p.author.avatarKey,
+            bio: p.author.description,
+          },
 
           // >>> projeção no formato esperado pelo front
           categories: p.categories.map(({ category }) => ({

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma"
 import { NotFoundError } from "@/http/_errors/not-found-error"
 import { PostStatus, Visibility } from "@prisma/client"
 import { isoOrNull } from "@/utils/blog-utils"
+import { hash } from "crypto"
 
 export async function getPost(app: FastifyInstance) {
   app.withTypeProvider<ZodTypeProvider>().get(
@@ -38,6 +39,7 @@ export async function getPost(app: FastifyInstance) {
               name: z.string(),
               username: z.string(),
               bio: z.string().nullable(),
+              hashAvatar: z.boolean(),
             }),
             coverUrl: z.string().nullable(),
             categories: z.array(
@@ -82,7 +84,13 @@ export async function getPost(app: FastifyInstance) {
         where,
         include: {
           author: {
-            select: { id: true, name: true, username: true, description: true },
+            select: {
+              id: true,
+              name: true,
+              username: true,
+              description: true,
+              avatarKey: true,
+            },
           },
           cover: { select: { url: true } },
           categories: {
@@ -116,6 +124,7 @@ export async function getPost(app: FastifyInstance) {
           name: post.author.name,
           username: post.author.username,
           bio: post.author.description,
+          hashAvatar: !!post.author.avatarKey,
         },
         coverUrl: post.cover?.url ?? null,
         categories: post.categories.map((c) => ({
