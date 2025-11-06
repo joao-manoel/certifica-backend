@@ -28,7 +28,7 @@ services:
     environment:
       # Jaeger vai ler métricas no Prometheus
       METRICS_STORAGE_TYPE: prometheus
-      PROMETHEUS_SERVER_URL: http://localhost:9091
+      PROMETHEUS_SERVER_URL: http://localhost:9090
       # Suporte ao conector de spanmetrics (nome/labels esperados)
       PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR: "true"
     ports:
@@ -68,6 +68,8 @@ services:
     restart: always
     env_file:
       - .env
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
     ports:
       - "3334:3333"
     depends_on:
