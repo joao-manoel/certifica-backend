@@ -1,6 +1,9 @@
+// lib/tracing.ts
 import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api"
 import { NodeSDK } from "@opentelemetry/sdk-node"
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc"
+import { Resource } from "@opentelemetry/resources"
+import { SemanticResourceAttributes as S } from "@opentelemetry/semantic-conventions"
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http"
 import { HttpInstrumentation } from "@opentelemetry/instrumentation-http"
 import { PrismaInstrumentation } from "@prisma/instrumentation"
 import { env } from "@/env"
@@ -8,9 +11,13 @@ import { env } from "@/env"
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.ERROR)
 
 const sdk = new NodeSDK({
-  serviceName: "certifica-api",
+  resource: new Resource({
+    [S.SERVICE_NAME]: "certifica-api",
+  }),
   traceExporter: new OTLPTraceExporter({
-    url: env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    // use HTTP 4318 com path /v1/traces
+    url:
+      env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://otel-collector:4318/v1/traces",
   }),
   instrumentations: [new HttpInstrumentation(), new PrismaInstrumentation()],
 })
