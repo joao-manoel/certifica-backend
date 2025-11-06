@@ -6,35 +6,17 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
-processors:
-  batch: {}
-
-# Conector que converte TRACES -> METRICS (RED)
-connectors:
-  spanmetrics:
-    histogram:
-      explicit:
-        buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s]
-    dimensions:
-      - service.name
-      - http.method
-      - http.status_code
-    metrics_namespace: traces_spanmetrics
-
 exporters:
-  # Traces para o Jaeger (gRPC 14250)
-  jaeger:
-    endpoint: jaeger:14250
+  debug:
+    verbosity: detailed
+
+  otlp:
+    endpoint: jaeger:4317
     tls:
       insecure: true
 
-  # Exposição de MÉTRICAS (Prometheus vai fazer scrape)
-  prometheus:
-    endpoint: 0.0.0.0:8889
-
-  # (opcional) debug de traces/métricas no log do collector
-  logging:
-    loglevel: debug
+processors:
+  batch: {}
 
 extensions:
   health_check: {}
@@ -45,9 +27,8 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [jaeger, logging]
-    # Métricas saem do conector spanmetrics
+      exporters: [debug, otlp]
     metrics:
-      receivers: [spanmetrics]
+      receivers: [otlp]
       processors: [batch]
-      exporters: [prometheus, logging]
+      exporters: [debug]
