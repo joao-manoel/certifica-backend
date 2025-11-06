@@ -17,6 +17,7 @@ export const env = createEnv({
     REDIS_PORT: z.coerce.number().default(6380),
     NODEMAILER_USER: z.string().min(1),
     NODEMAILER_PASSWORD: z.string().min(1),
+    OTEL_EXPORTER_OTLP_ENDPOINT: z.string().min(1),
   },
   runtimeEnv: {
     PORT: process.env.PORT,
@@ -29,5 +30,6 @@ export const env = createEnv({
     API_KEY: process.env.API_KEY,
     NODEMAILER_USER: process.env.NODEMAILER_USER,
     NODEMAILER_PASSWORD: process.env.NODEMAILER_PASSWORD,
+    OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
   },
 })
