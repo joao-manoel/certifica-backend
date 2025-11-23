@@ -18,7 +18,7 @@ export async function getRelatedPosts(app: FastifyInstance) {
           identifier: z.string().min(1),
         }),
         querystring: z.object({
-          limit: z.coerce.number().int().min(1).max(3).default(3),
+          limit: z.coerce.number().int().min(1).max(20).default(3),
         }),
         response: {
           200: z.object({
@@ -46,9 +46,6 @@ export async function getRelatedPosts(app: FastifyInstance) {
       const { identifier } = request.params
       const { limit } = request.query
 
-      // guarda de segurança: nunca passar de 3 internamente
-      const safeLimit = Math.min(limit, 3)
-
       const isUUID =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
           identifier,
@@ -73,6 +70,8 @@ export async function getRelatedPosts(app: FastifyInstance) {
         id: { not: basePost.id },
         visibility: Visibility.PUBLIC,
         status: PostStatus.PUBLISHED,
+        // se quiser garantir que só volte publicado com data setada:
+        // publishedAt: { not: null },
       } as const
 
       const relatedCandidates = hasSignals
@@ -97,8 +96,7 @@ export async function getRelatedPosts(app: FastifyInstance) {
               categories: { select: { categoryId: true } },
             },
             orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
-            // busca um pool maior, mas baseado no safeLimit
-            take: Math.max(safeLimit * 3, 20),
+            take: Math.max(limit * 3, 20),
           })
         : []
 
@@ -114,8 +112,7 @@ export async function getRelatedPosts(app: FastifyInstance) {
               categories: { select: { categoryId: true } },
             },
             orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
-            // aqui já limitado a <= 3
-            take: safeLimit,
+            take: limit,
           })
         : []
 
@@ -145,8 +142,7 @@ export async function getRelatedPosts(app: FastifyInstance) {
           const bDate = b.p.publishedAt ?? b.p.updatedAt
           return (bDate?.getTime() ?? 0) - (aDate?.getTime() ?? 0)
         })
-        // aqui também usa safeLimit
-        .slice(0, safeLimit)
+        .slice(0, limit)
         .map(({ p, score }) => ({
           id: p.id,
           title: p.title,
