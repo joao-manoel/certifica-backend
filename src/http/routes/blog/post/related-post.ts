@@ -19,7 +19,8 @@ export async function getRelatedPosts(app: FastifyInstance) {
         }),
         querystring: z.object({
           limit: z.coerce.number().int().min(1).max(20).default(6),
-          includeScheduled: z.coerce.boolean().optional().default(false),
+          // se quiser, pode deixar includeScheduled aqui, mas ele
+          // não terá mais efeito. Estou removendo pra ficar limpo.
         }),
         response: {
           200: z.object({
@@ -45,7 +46,7 @@ export async function getRelatedPosts(app: FastifyInstance) {
     },
     async (request, reply) => {
       const { identifier } = request.params
-      const { limit, includeScheduled } = request.query
+      const { limit } = request.query
 
       const isUUID =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -66,13 +67,13 @@ export async function getRelatedPosts(app: FastifyInstance) {
       const categoryIds = basePost.categories.map((c) => c.categoryId)
       const hasSignals = tagIds.length > 0 || categoryIds.length > 0
 
-      // 2) Busca candidatos relacionados (publicados + públicos)
+      // 2) Apenas posts PUBLIC + PUBLISHED
       const wherePublishedPublic = {
         id: { not: basePost.id },
         visibility: Visibility.PUBLIC,
-        OR: includeScheduled
-          ? [{ status: PostStatus.PUBLISHED }, { status: PostStatus.SCHEDULED }]
-          : [{ status: PostStatus.PUBLISHED }],
+        status: PostStatus.PUBLISHED,
+        // se quiser garantir que só volte publicado com data setada:
+        // publishedAt: { not: null },
       } as const
 
       const relatedCandidates = hasSignals
@@ -101,7 +102,7 @@ export async function getRelatedPosts(app: FastifyInstance) {
           })
         : []
 
-      // 3) Se não achou nada, FALLBACK: últimos posts (publicados + públicos)
+      // 3) Se não achou nada, FALLBACK: últimos posts PUBLIC + PUBLISHED
       const needsFallback = relatedCandidates.length === 0
       const fallbackPosts = needsFallback
         ? await prisma.post.findMany({
@@ -134,7 +135,7 @@ export async function getRelatedPosts(app: FastifyInstance) {
                 0,
               )
             : 0
-          const score = needsFallback ? 0 : commonTags * 2 + commonCats * 1 // fallback = 0
+          const score = needsFallback ? 0 : commonTags * 2 + commonCats * 1
           return { p, score }
         })
         .sort((a, b) => {
