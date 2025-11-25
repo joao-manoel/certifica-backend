@@ -20,7 +20,7 @@ export async function listPublicPosts(app: FastifyInstance) {
           category: z.string().optional(), // slug da categoria
           tag: z.string().optional(), // slug da tag
 
-          orderBy: z.enum(["createdAt", "publishedAt"]).default("createdAt"),
+          orderBy: z.enum(["createdAt", "publishedAt"]).default("publishedAt"),
           orderDir: z.enum(["asc", "desc"]).default("desc"),
         }),
         response: {
@@ -126,7 +126,6 @@ export async function listPublicPosts(app: FastifyInstance) {
             },
             cover: { select: { url: true } },
 
-            // >>> inclui ponte e entidade para projetar depois
             categories: {
               select: {
                 category: { select: { id: true, name: true, slug: true } },
