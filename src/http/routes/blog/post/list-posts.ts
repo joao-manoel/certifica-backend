@@ -22,9 +22,8 @@ export async function listPost(app: FastifyInstance) {
             page: z.coerce.number().int().positive().default(1),
             pageSize: z.coerce.number().int().min(1).max(100).default(10),
             authorId: z.string().uuid().optional(),
-            category: z.string().optional(), // slug da categoria
-            tag: z.string().optional(), // slug da tag
-
+            category: z.string().optional(),
+            tag: z.string().optional(),
             orderBy: z.enum(["createdAt", "publishedAt"]).default("createdAt"),
             orderDir: z.enum(["asc", "desc"]).default("desc"),
           }),
