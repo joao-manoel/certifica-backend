@@ -27,6 +27,7 @@ import { setAvatar } from "./users/set-avatar"
 import { getUserAvatarByUsername } from "./users/get-user-avatar-by-username"
 import { uploadMedia } from "./blog/media/upload-media"
 import { validatePost } from "./blog/post/validate-post"
+import { apiClients } from "./integrations/api-clients"
 
 export async function routes(app: FastifyInstance) {
   //ROTA PARA AUTHENTICAÇÃO
@@ -69,4 +70,7 @@ export async function routes(app: FastifyInstance) {
   app.register(createMedia)
   app.register(uploadMedia)
   app.register(listMedia)
+
+  // INTEGRAÇÕES
+  app.register(apiClients)
 }

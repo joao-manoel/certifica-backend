@@ -20,6 +20,16 @@ credenciais AWS existem somente no ambiente da API.
 3. Crie um cliente com o script `api-client:create`.
 4. Entregue o token uma única vez ao responsável pelo cliente local.
 
+Administradores e editores também podem gerenciar os próprios tokens pelo
+dashboard em `/integrations`. A API expõe:
+
+- `GET /integrations/api-clients`;
+- `POST /integrations/api-clients`;
+- `DELETE /integrations/api-clients/:id` para revogação.
+
+Essas rotas aceitam somente JWT de usuário; um token de integração não pode
+criar ou revogar outros tokens. O segredo aparece apenas na resposta de criação.
+
 Exemplo:
 
 ```bash
