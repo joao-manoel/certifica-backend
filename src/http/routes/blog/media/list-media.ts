@@ -62,7 +62,8 @@ export async function listMedia(app: FastifyInstance) {
         },
       },
       async (request, reply) => {
-        const userId = await request.getCurrentUserId()
+        const context = await request.requireScopes(["media:read"])
+        const userId = context.userId
         const user = await prisma.user.findUnique({
           where: { id: userId },
           select: { id: true, role: true },

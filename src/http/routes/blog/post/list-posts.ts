@@ -75,7 +75,8 @@ export async function listPost(app: FastifyInstance) {
         },
       },
       async (request, reply) => {
-        const userId = await request.getCurrentUserId()
+        const context = await request.requireScopes(["posts:read"])
+        const userId = context.userId
 
         const user = await prisma.user.findUnique({
           where: {

@@ -16,6 +16,17 @@ import {
   makeUniqueSlug,
   slugify,
 } from "@/utils/blog-utils"
+import {
+  editorContentSchema,
+  sanitizeEditorContent,
+  validatePostManifest,
+} from "@/utils/editor-content"
+import { writeAuditLog } from "@/lib/audit"
+import {
+  findIdempotentResponse,
+  hashPayload,
+  saveIdempotentResponse,
+} from "@/lib/idempotency"
 
 export async function createPost(app: FastifyInstance) {
   app
@@ -31,7 +42,11 @@ export async function createPost(app: FastifyInstance) {
             title: z.string().min(3).max(160),
             slug: z.string().min(1).max(140).optional(),
             excerpt: z.string().max(300).optional(),
-            content: z.any(),
+            seoTitle: z.string().max(60).optional().nullable(),
+            metaDescription: z.string().max(160).optional().nullable(),
+            focusKeyword: z.string().max(160).optional().nullable(),
+            imageCredit: z.string().max(300).optional().nullable(),
+            content: editorContentSchema,
             coverId: z.string().uuid().nullable().optional(),
 
             status: z.nativeEnum(PostStatus).default(PostStatus.DRAFT),
@@ -71,12 +86,14 @@ export async function createPost(app: FastifyInstance) {
               readTime: z.number().int(),
               createdAt: z.string().datetime(),
               updatedAt: z.string().datetime(),
+              version: z.number().int().positive(),
             }),
           },
         },
       },
       async (request, reply) => {
-        const userId = await request.getCurrentUserId()
+        const context = await request.requireScopes(["posts:write"])
+        const userId = context.userId
 
         const user = await prisma.user.findUnique({
           where: { id: userId },
@@ -94,6 +111,10 @@ export async function createPost(app: FastifyInstance) {
           title,
           slug: slugInput,
           excerpt,
+          seoTitle,
+          metaDescription,
+          focusKeyword,
+          imageCredit,
           content,
           coverId,
           status,
@@ -102,6 +123,38 @@ export async function createPost(app: FastifyInstance) {
           categoryNames = [],
           tagNames = [],
         } = request.body
+
+        if (status !== PostStatus.DRAFT) {
+          await request.requireScopes(["posts:publish"])
+        }
+
+        const validation = validatePostManifest({
+          title,
+          excerpt,
+          seoTitle,
+          metaDescription,
+          focusKeyword,
+          content,
+          coverId,
+        })
+        if (!validation.valid) {
+          throw new BadRequestError(validation.errors.join(" "))
+        }
+
+        const sanitizedContent = sanitizeEditorContent(content)
+        const idempotencyKey = request.headers["idempotency-key"] as
+          | string
+          | undefined
+        const requestHash = hashPayload(request.body)
+        const replay = await findIdempotentResponse(
+          context.apiClientId,
+          idempotencyKey,
+          "create-post",
+          requestHash,
+        )
+        if (replay) {
+          return reply.code(201).send(replay.response as never)
+        }
 
         // regras de datas/status
         let publishedAt: Date | null = null
@@ -139,7 +192,7 @@ export async function createPost(app: FastifyInstance) {
         const uniqueSlug = await makeUniqueSlug(baseSlug)
 
         // métricas e excerpt
-        const plain = jsonToPlainText(content)
+        const plain = jsonToPlainText(sanitizedContent)
         const wc = countWords(plain)
         const rt = estimateReadTimeMinutes(wc)
         const finalExcerpt = clampExcerpt(excerpt, plain)
@@ -177,7 +230,11 @@ export async function createPost(app: FastifyInstance) {
               title,
               slug: uniqueSlug,
               excerpt: finalExcerpt || null,
-              content,
+              content: sanitizedContent,
+              seoTitle: seoTitle ?? null,
+              metaDescription: metaDescription ?? null,
+              focusKeyword: focusKeyword ?? null,
+              imageCredit: imageCredit ?? null,
               coverId: coverId ?? null,
               status,
               visibility,
@@ -233,7 +290,7 @@ export async function createPost(app: FastifyInstance) {
           return post
         })
 
-        return reply.code(201).send({
+        const response = {
           id: created.id,
           slug: created.slug,
           status: created.status,
@@ -244,7 +301,23 @@ export async function createPost(app: FastifyInstance) {
           readTime: created.readTime,
           createdAt: created.createdAt.toISOString(),
           updatedAt: created.updatedAt.toISOString(),
+          version: created.version,
+        }
+
+        await saveIdempotentResponse({
+          apiClientId: context.apiClientId,
+          key: idempotencyKey,
+          operation: "create-post",
+          requestHash,
+          statusCode: 201,
+          response,
         })
+        await writeAuditLog(context, "post.create", "Post", created.id, {
+          status: created.status,
+          slug: created.slug,
+        })
+
+        return reply.code(201).send(response)
       },
     )
 }

@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@/http/middlewares/auth"
 import { UnauthorizedError } from "@/http/_errors/unauthorized-error"
 import { BadRequestError } from "@/http/_errors/bad-request-error"
-import { Role, PostStatus, Visibility } from "@prisma/client"
+import { Prisma, Role, PostStatus, Visibility } from "@prisma/client"
 import {
   clampExcerpt,
   countWords,
@@ -15,6 +15,16 @@ import {
   jsonToPlainText,
   slugify,
 } from "@/utils/blog-utils"
+import {
+  editorContentSchema,
+  sanitizeEditorContent,
+} from "@/utils/editor-content"
+import { writeAuditLog } from "@/lib/audit"
+import {
+  findIdempotentResponse,
+  hashPayload,
+  saveIdempotentResponse,
+} from "@/lib/idempotency"
 
 // helper local para garantir slug único, preservando o próprio post
 async function ensureUniqueSlug(base: string, currentPostId: string) {
@@ -60,8 +70,13 @@ export async function editPost(app: FastifyInstance) {
             title: z.string().min(3).max(160).optional(),
             slug: z.string().min(1).max(140).optional(),
             excerpt: z.string().max(300).optional(),
-            content: z.any().optional(),
+            seoTitle: z.string().max(60).optional().nullable(),
+            metaDescription: z.string().max(160).optional().nullable(),
+            focusKeyword: z.string().max(160).optional().nullable(),
+            imageCredit: z.string().max(300).optional().nullable(),
+            content: editorContentSchema.optional(),
             coverId: z.string().uuid().nullable().optional(),
+            expectedVersion: z.number().int().positive().optional(),
 
             status: z.nativeEnum(PostStatus).optional(),
             visibility: z.nativeEnum(Visibility).optional(),
@@ -99,12 +114,14 @@ export async function editPost(app: FastifyInstance) {
               readTime: z.number().int(),
               createdAt: z.string().datetime(),
               updatedAt: z.string().datetime(),
+              version: z.number().int().positive(),
             }),
           },
         },
       },
       async (request, reply) => {
-        const userId = await request.getCurrentUserId()
+        const context = await request.requireScopes(["posts:write"])
+        const userId = context.userId
 
         const user = await prisma.user.findUnique({
           where: { id: userId },
@@ -119,6 +136,19 @@ export async function editPost(app: FastifyInstance) {
         }
 
         const { id } = request.params
+        const idempotencyKey = request.headers["idempotency-key"] as
+          | string
+          | undefined
+        const requestHash = hashPayload({ id, body: request.body })
+        const replay = await findIdempotentResponse(
+          context.apiClientId,
+          idempotencyKey,
+          "update-post",
+          requestHash,
+        )
+        if (replay) {
+          return reply.code(200).send(replay.response as never)
+        }
 
         const existing = await prisma.post.findUnique({
           where: { id },
@@ -138,6 +168,7 @@ export async function editPost(app: FastifyInstance) {
             // ★ incluir para evitar indexação dinâmica
             wordCount: true,
             readTime: true,
+            version: true,
           },
         })
 
@@ -149,6 +180,10 @@ export async function editPost(app: FastifyInstance) {
           title,
           slug,
           excerpt,
+          seoTitle,
+          metaDescription,
+          focusKeyword,
+          imageCredit,
           content,
           coverId,
           status,
@@ -156,7 +191,20 @@ export async function editPost(app: FastifyInstance) {
           scheduledFor,
           categoryNames,
           tagNames,
+          expectedVersion,
         } = request.body
+
+        if (status && status !== PostStatus.DRAFT) {
+          await request.requireScopes(["posts:publish"])
+        }
+        if (
+          expectedVersion !== undefined &&
+          expectedVersion !== existing.version
+        ) {
+          throw new BadRequestError(
+            `Conflito de versão. Atual: ${existing.version}.`,
+          )
+        }
 
         // Validar coverId (quando enviado não-nulo)
         if (coverId !== undefined && coverId !== null) {
@@ -205,7 +253,9 @@ export async function editPost(app: FastifyInstance) {
         }
 
         // Métricas/excerpt: recalcula só se content/excerpt mudarem
-        const newContent = content !== undefined ? content : existing.content
+        const sanitizedContent =
+          content !== undefined ? sanitizeEditorContent(content) : undefined
+        const newContent = sanitizedContent ?? existing.content
         const plain = jsonToPlainText(newContent)
         const shouldRecompute = content !== undefined || excerpt !== undefined
 
@@ -254,7 +304,13 @@ export async function editPost(app: FastifyInstance) {
             ...(title !== undefined ? { title } : {}),
             ...(slug !== undefined ? { slug: nextSlug } : {}),
             ...(excerpt !== undefined ? { excerpt: finalExcerpt } : {}),
-            ...(content !== undefined ? { content: newContent } : {}),
+            ...(seoTitle !== undefined ? { seoTitle } : {}),
+            ...(metaDescription !== undefined ? { metaDescription } : {}),
+            ...(focusKeyword !== undefined ? { focusKeyword } : {}),
+            ...(imageCredit !== undefined ? { imageCredit } : {}),
+            ...(sanitizedContent !== undefined
+              ? { content: sanitizedContent as Prisma.InputJsonValue }
+              : {}),
             ...(visibility !== undefined ? { visibility } : {}),
             ...(status !== undefined ? { status: nextStatus } : {}),
             ...(status !== undefined || scheduledFor !== undefined
@@ -268,6 +324,7 @@ export async function editPost(app: FastifyInstance) {
                   readTime: nextReadTime,
                 }
               : {}),
+            version: { increment: 1 },
           } satisfies Parameters<typeof prisma.post.update>[0]["data"]
 
           const post = await tx.post.update({
@@ -331,7 +388,7 @@ export async function editPost(app: FastifyInstance) {
         })
 
         // ★ sem cast para any; os campos existem no modelo
-        return reply.code(200).send({
+        const response = {
           id: updated.id,
           slug: updated.slug,
           status: updated.status,
@@ -342,7 +399,21 @@ export async function editPost(app: FastifyInstance) {
           readTime: updated.readTime,
           createdAt: updated.createdAt.toISOString(),
           updatedAt: updated.updatedAt.toISOString(),
+          version: updated.version,
+        }
+        await saveIdempotentResponse({
+          apiClientId: context.apiClientId,
+          key: idempotencyKey,
+          operation: "update-post",
+          requestHash,
+          statusCode: 200,
+          response,
         })
+        await writeAuditLog(context, "post.update", "Post", updated.id, {
+          status: updated.status,
+          version: updated.version,
+        })
+        return reply.code(200).send(response)
       },
     )
 }

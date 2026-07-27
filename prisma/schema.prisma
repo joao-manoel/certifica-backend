@@ -46,8 +46,10 @@ model User {
   avatarMime      String?   @db.VarChar(100)
   avatarUpdatedAt DateTime?
 
-  Post    Post[]
-  Comment Comment[]
+  Post       Post[]
+  Comment    Comment[]
+  apiClients ApiClient[]
+  auditLogs  AuditLog[]
 }
 
 model Post {
@@ -55,9 +57,13 @@ model Post {
   authorId String
   author   User   @relation(fields: [authorId], references: [id]) // RESTRICT (default)
 
-  title   String
-  slug    String  @unique
-  excerpt String? @db.VarChar(300)
+  title           String
+  slug            String  @unique
+  excerpt         String? @db.VarChar(300)
+  seoTitle        String? @db.VarChar(60)
+  metaDescription String? @db.VarChar(160)
+  focusKeyword    String? @db.VarChar(160)
+  imageCredit     String? @db.VarChar(300)
 
   content Json
   coverId String?
@@ -79,6 +85,7 @@ model Post {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  version   Int      @default(1)
 
   PostView PostView[]
 
@@ -86,6 +93,56 @@ model Post {
   @@index([publishedAt])
   @@index([visibility])
   @@index([status, scheduledFor])
+}
+
+model ApiClient {
+  id         String    @id @default(uuid())
+  name       String
+  tokenHash  String    @unique @db.VarChar(64)
+  authorId   String
+  author     User      @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  scopes     String[]
+  isActive   Boolean   @default(true)
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  auditLogs          AuditLog[]
+  idempotencyRecords IdempotencyRecord[]
+}
+
+model AuditLog {
+  id           String     @id @default(uuid())
+  apiClientId  String?
+  apiClient    ApiClient? @relation(fields: [apiClientId], references: [id], onDelete: SetNull)
+  userId       String?
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action       String     @db.VarChar(100)
+  resourceType String     @db.VarChar(80)
+  resourceId   String?
+  metadata     Json?
+  createdAt    DateTime   @default(now())
+
+  @@index([apiClientId, createdAt])
+  @@index([userId, createdAt])
+  @@index([resourceType, resourceId])
+}
+
+model IdempotencyRecord {
+  id          String    @id @default(uuid())
+  apiClientId String
+  apiClient   ApiClient @relation(fields: [apiClientId], references: [id], onDelete: Cascade)
+  key         String    @db.VarChar(200)
+  operation   String    @db.VarChar(100)
+  requestHash String    @db.VarChar(64)
+  statusCode  Int
+  response    Json
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  @@unique([apiClientId, key, operation])
+  @@index([expiresAt])
 }
 
 enum ViewStatus {

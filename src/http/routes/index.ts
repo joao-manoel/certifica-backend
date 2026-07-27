@@ -26,6 +26,7 @@ import { getMetrics } from "./blog/post/metrics/get-metrics"
 import { setAvatar } from "./users/set-avatar"
 import { getUserAvatarByUsername } from "./users/get-user-avatar-by-username"
 import { uploadMedia } from "./blog/media/upload-media"
+import { validatePost } from "./blog/post/validate-post"
 
 export async function routes(app: FastifyInstance) {
   //ROTA PARA AUTHENTICAÇÃO
@@ -55,6 +56,7 @@ export async function routes(app: FastifyInstance) {
   //metricas
   app.register(getPostStats)
   app.register(getMetrics)
+  app.register(validatePost)
 
   //ANALYTICS
   app.register(createUtmEvent)

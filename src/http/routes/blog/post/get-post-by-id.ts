@@ -26,6 +26,10 @@ export async function getPostById(app: FastifyInstance) {
               title: z.string(),
               slug: z.string(),
               excerpt: z.string().nullable(),
+              seoTitle: z.string().nullable(),
+              metaDescription: z.string().nullable(),
+              focusKeyword: z.string().nullable(),
+              imageCredit: z.string().nullable(),
               content: z.any(),
               coverId: z.string().uuid().nullable(),
               coverUrl: z.string().url().nullable(),
@@ -37,6 +41,7 @@ export async function getPostById(app: FastifyInstance) {
               readTime: z.number().int(),
               createdAt: z.string().datetime(),
               updatedAt: z.string().datetime(),
+              version: z.number().int().positive(),
               categories: z.array(
                 z.object({ name: z.string(), slug: z.string() }),
               ),
@@ -46,7 +51,8 @@ export async function getPostById(app: FastifyInstance) {
         },
       },
       async (request, reply) => {
-        const userId = await request.getCurrentUserId()
+        const context = await request.requireScopes(["posts:read"])
+        const userId = context.userId
         if (!userId) throw new UnauthorizedError("Usuário não autenticado.")
 
         const { id } = request.params
@@ -58,6 +64,10 @@ export async function getPostById(app: FastifyInstance) {
             title: true,
             slug: true,
             excerpt: true,
+            seoTitle: true,
+            metaDescription: true,
+            focusKeyword: true,
+            imageCredit: true,
             content: true,
             coverId: true,
             status: true,
@@ -68,6 +78,7 @@ export async function getPostById(app: FastifyInstance) {
             readTime: true,
             createdAt: true,
             updatedAt: true,
+            version: true,
             cover: { select: { url: true } },
             categories: {
               select: { category: { select: { name: true, slug: true } } },
@@ -87,6 +98,10 @@ export async function getPostById(app: FastifyInstance) {
           title: post.title,
           slug: post.slug,
           excerpt: post.excerpt,
+          seoTitle: post.seoTitle,
+          metaDescription: post.metaDescription,
+          focusKeyword: post.focusKeyword,
+          imageCredit: post.imageCredit,
           content: post.content,
           coverId: post.coverId,
           coverUrl: post.cover?.url ?? null,
@@ -98,6 +113,7 @@ export async function getPostById(app: FastifyInstance) {
           readTime: post.readTime,
           createdAt: post.createdAt.toISOString(),
           updatedAt: post.updatedAt.toISOString(),
+          version: post.version,
           // se não houver vínculos, retorna []
           categories: (post.categories ?? []).map((c) => c.category),
           tags: (post.tags ?? []).map((t) => t.tag),

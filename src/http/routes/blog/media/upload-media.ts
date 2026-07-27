@@ -20,6 +20,12 @@ import {
   uploadToS3,
 } from "@/lib/s3"
 import { prisma } from "@/lib/prisma"
+import { writeAuditLog } from "@/lib/audit"
+import {
+  findIdempotentResponse,
+  hashPayload,
+  saveIdempotentResponse,
+} from "@/lib/idempotency"
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024
 const CACHE_CONTROL = "public, max-age=31536000, immutable"
@@ -50,7 +56,8 @@ export async function uploadMedia(app: FastifyInstance) {
         },
       },
       async (request, reply) => {
-        const userId = await request.getCurrentUserId()
+        const context = await request.requireScopes(["media:write"])
+        const userId = context.userId
         const user = await prisma.user.findUnique({
           where: { id: userId },
           select: { role: true },
@@ -119,6 +126,23 @@ export async function uploadMedia(app: FastifyInstance) {
           throw new BadRequestError("Arquivo 'file' é obrigatório.")
         }
 
+        const idempotencyKey = request.headers["idempotency-key"] as
+          | string
+          | undefined
+        const requestHash = hashPayload({
+          alt,
+          file: uploadedFile.buffer.toString("base64"),
+        })
+        const replay = await findIdempotentResponse(
+          context.apiClientId,
+          idempotencyKey,
+          "upload-media",
+          requestHash,
+        )
+        if (replay) {
+          return reply.code(201).send(replay.response as never)
+        }
+
         let processed: Buffer
         let info: sharp.OutputInfo
         try {
@@ -179,7 +203,29 @@ export async function uploadMedia(app: FastifyInstance) {
             },
           })
 
-          return reply.code(201).send(serializeMedia(created))
+          const response = serializeMedia(created)
+          await saveIdempotentResponse({
+            apiClientId: context.apiClientId,
+            key: idempotencyKey,
+            operation: "upload-media",
+            requestHash,
+            statusCode: 201,
+            response,
+          })
+          await writeAuditLog(
+            context,
+            "media.upload",
+            "Media",
+            created.id,
+            {
+              storageKey: key,
+              mimeType: detected.mimeType,
+              width: info.width,
+              height: info.height,
+            },
+          )
+
+          return reply.code(201).send(response)
         } catch (error) {
           try {
             await deleteFromS3(key)
