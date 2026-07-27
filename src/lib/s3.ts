@@ -23,6 +23,7 @@ interface UploadInput {
   buffer: Buffer
   filename: string
   mimetype: string
+  cacheControl?: string
 }
 
 export async function uploadToS3(file: UploadInput, folder: string) {
@@ -35,11 +36,22 @@ export async function uploadToS3(file: UploadInput, folder: string) {
       Key: key,
       Body: file.buffer,
       ContentType: file.mimetype,
+      CacheControl: file.cacheControl,
       // ACL padrão já é privado – mantenha assim
     }),
   )
 
   return { key }
+}
+
+export function getPublicS3Url(key: string) {
+  const baseUrl = env.S3_BASE_URL.replace(/\/+$/, "")
+  const encodedKey = key
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")
+
+  return `${baseUrl}/${encodedKey}`
 }
 
 export async function deleteFromS3(key: string) {

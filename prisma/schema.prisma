@@ -25,6 +25,11 @@ enum Visibility {
   PRIVATE
 }
 
+enum MediaSource {
+  EXTERNAL
+  S3
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String?  @unique
@@ -35,11 +40,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  description String?  @db.VarChar(500)
+  description String? @db.VarChar(500)
 
-  avatarKey        String?  @db.VarChar(300) 
-  avatarMime       String?  @db.VarChar(100)
-  avatarUpdatedAt  DateTime?
+  avatarKey       String?   @db.VarChar(300)
+  avatarMime      String?   @db.VarChar(100)
+  avatarUpdatedAt DateTime?
 
   Post    Post[]
   Comment Comment[]
@@ -173,13 +178,15 @@ model UtmCampaign {
 }
 
 model Media {
-  id          String  @id @default(uuid())
+  id          String      @id @default(uuid())
   url         String
-  alt         String? @db.VarChar(500)
-  mimeType    String? @db.VarChar(100)
+  source      MediaSource @default(EXTERNAL)
+  storageKey  String?     @unique
+  alt         String?     @db.VarChar(500)
+  mimeType    String?     @db.VarChar(100)
   width       Int?
   height      Int?
-  dominantClr String? @db.VarChar(12)
+  dominantClr String?     @db.VarChar(12)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

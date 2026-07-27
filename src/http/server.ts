@@ -23,7 +23,7 @@ import path from "path"
 // Configurações do servidor
 const app = fastify({
   //logger: true,
-  bodyLimit: 15 * 1024 * 1024, // 15MB
+  bodyLimit: 30 * 1024 * 1024, // comporta uploads multipart de até 25MB
   connectionTimeout: 60000, // 60 segundos
   keepAliveTimeout: 60000, // 60 segundos
 }).withTypeProvider<ZodTypeProvider>()

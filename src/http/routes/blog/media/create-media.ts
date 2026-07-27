@@ -8,6 +8,10 @@ import { UnauthorizedError } from "@/http/_errors/unauthorized-error"
 import { BadRequestError } from "@/http/_errors/bad-request-error"
 import { Role } from "@prisma/client"
 import { guessMimeTypeFromUrl, normalizeHexColor } from "@/utils/midia-utils"
+import {
+  mediaResponseSchema,
+  serializeMedia,
+} from "@/http/routes/blog/media/media-response"
 
 export async function createMedia(app: FastifyInstance) {
   app
@@ -28,17 +32,7 @@ export async function createMedia(app: FastifyInstance) {
             dominantClr: z.string().max(12).optional().nullable(),
           }),
           response: {
-            201: z.object({
-              id: z.string().uuid(),
-              url: z.string().url(),
-              alt: z.string().nullable(),
-              mimeType: z.string().nullable(),
-              width: z.number().int().nullable(),
-              height: z.number().int().nullable(),
-              dominantClr: z.string().nullable(),
-              createdAt: z.string().datetime(),
-              updatedAt: z.string().datetime(),
-            }),
+            201: mediaResponseSchema,
           },
         },
       },
@@ -75,22 +69,13 @@ export async function createMedia(app: FastifyInstance) {
         // (Opcional) Evitar registros idênticos por URL — se preferir sempre criar, remova esse bloco
         const existing = await prisma.media.findFirst({ where: { url } })
         if (existing) {
-          return reply.code(201).send({
-            id: existing.id,
-            url: existing.url,
-            alt: existing.alt,
-            mimeType: existing.mimeType,
-            width: existing.width,
-            height: existing.height,
-            dominantClr: existing.dominantClr,
-            createdAt: existing.createdAt.toISOString(),
-            updatedAt: existing.updatedAt.toISOString(),
-          })
+          return reply.code(201).send(serializeMedia(existing))
         }
 
         const created = await prisma.media.create({
           data: {
             url,
+            source: "EXTERNAL",
             alt: alt ?? null,
             mimeType: finalMime,
             width: width ?? null,
@@ -99,17 +84,7 @@ export async function createMedia(app: FastifyInstance) {
           },
         })
 
-        return reply.code(201).send({
-          id: created.id,
-          url: created.url,
-          alt: created.alt,
-          mimeType: created.mimeType,
-          width: created.width,
-          height: created.height,
-          dominantClr: created.dominantClr,
-          createdAt: created.createdAt.toISOString(),
-          updatedAt: created.updatedAt.toISOString(),
-        })
+        return reply.code(201).send(serializeMedia(created))
       },
     )
 }
