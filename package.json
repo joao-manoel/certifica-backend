@@ -10,7 +10,8 @@
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
     "build": "tsc && tsc-alias",
-    "api-client:create": "tsx --require tsconfig-paths/register scripts/create-api-client.ts"
+    "api-client:create": "tsx --require tsconfig-paths/register scripts/create-api-client.ts",
+    "media:migrate-urls": "tsx --require tsconfig-paths/register scripts/migrate-s3-media-urls.ts"
   },
   "keywords": [],
   "author": "Joao-manoel",

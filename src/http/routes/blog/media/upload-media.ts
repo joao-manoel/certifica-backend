@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto"
+
+import { Role } from "@prisma/client"
 import type { FastifyInstance } from "fastify"
 import type { ZodTypeProvider } from "fastify-type-provider-zod"
-import { Role } from "@prisma/client"
 import sharp from "sharp"
 
 import { BadRequestError } from "@/http/_errors/bad-request-error"
@@ -13,12 +15,8 @@ import {
   mediaResponseSchema,
   serializeMedia,
 } from "@/http/routes/blog/media/media-response"
-import {
-  deleteFromS3,
-  getPublicS3Url,
-  streamToBuffer,
-  uploadToS3,
-} from "@/lib/s3"
+import { getMediaDeliveryUrl } from "@/http/routes/blog/media/media-url"
+import { deleteFromS3, streamToBuffer, uploadToS3 } from "@/lib/s3"
 import { prisma } from "@/lib/prisma"
 import { writeAuditLog } from "@/lib/audit"
 import {
@@ -190,9 +188,11 @@ export async function uploadMedia(app: FastifyInstance) {
         )
 
         try {
+          const mediaId = randomUUID()
           const created = await prisma.media.create({
             data: {
-              url: getPublicS3Url(key),
+              id: mediaId,
+              url: getMediaDeliveryUrl(mediaId),
               source: "S3",
               storageKey: key,
               alt,
@@ -212,18 +212,12 @@ export async function uploadMedia(app: FastifyInstance) {
             statusCode: 201,
             response,
           })
-          await writeAuditLog(
-            context,
-            "media.upload",
-            "Media",
-            created.id,
-            {
-              storageKey: key,
-              mimeType: detected.mimeType,
-              width: info.width,
-              height: info.height,
-            },
-          )
+          await writeAuditLog(context, "media.upload", "Media", created.id, {
+            storageKey: key,
+            mimeType: detected.mimeType,
+            width: info.width,
+            height: info.height,
+          })
 
           return reply.code(201).send(response)
         } catch (error) {

@@ -57,21 +57,30 @@ Os dois endpoints retornam HTTP `201` com:
 
 Assim, `GET /blog/media`, `coverId` e os consumidores atuais não mudam.
 
-### URL estável, não URL assinada curta
+### URL estável da API com redirecionamento assinado
 
 Posts e capas precisam continuar acessíveis depois que a página foi renderizada.
-Por isso, `getSignedGetUrl(..., 60)` não deve ser persistido em `Media.url`.
+O padrão adotado, seguindo a API ArcaRVT, mantém uma URL permanente da API em
+`Media.url`:
 
-Recomendação de produção:
+`{API_URL}/blog/media/{mediaId}/file`
 
-- bucket privado;
-- CloudFront/CDN com acesso ao bucket por OAC;
-- `S3_BASE_URL` apontando para o domínio estável do CDN;
-- API com permissão de escrita, sem expor credenciais ao dashboard.
+Essa rota pública consulta a `storageKey`, cria uma URL assinada do S3 válida por
+60 segundos e responde com redirecionamento. A resposta de redirecionamento usa
+`Cache-Control: no-store` para impedir que clientes guardem a URL temporária
+depois da expiração.
 
-Se o ambiente atual usa leitura pública do bucket, `S3_BASE_URL` pode apontar
-temporariamente para essa origem. A URL final será
-`{S3_BASE_URL}/{storageKey}`.
+Com isso:
+
+- o bucket continua privado;
+- posts nunca armazenam uma URL assinada temporária;
+- credenciais AWS permanecem somente na API;
+- não é necessário liberar leitura pública nem configurar CloudFront;
+- o navegador recebe a imagem por meio de um redirecionamento seguro.
+
+O comando `npm run media:migrate-urls` converte mídias S3 e URLs já inseridas no
+HTML dos posts para o novo endpoint. Em produção, `API_URL` deve conter a URL
+pública HTTPS da API antes de executar o comando.
 
 ### Registrar a origem e a chave
 
@@ -113,10 +122,10 @@ Content-Type: `multipart/form-data`
 
 Campos:
 
-| Campo | Tipo | Obrigatório | Regra |
-| --- | --- | --- | --- |
-| `file` | arquivo | sim | uma imagem permitida |
-| `alt` | texto | não | trim, máximo de 200 caracteres |
+| Campo  | Tipo    | Obrigatório | Regra                          |
+| ------ | ------- | ----------- | ------------------------------ |
+| `file` | arquivo | sim         | uma imagem permitida           |
+| `alt`  | texto   | não         | trim, máximo de 200 caracteres |
 
 Resposta:
 
@@ -160,7 +169,7 @@ S3 e PostgreSQL não compartilham transação. A rota deve compensar falhas:
 2. ler o arquivo com limite;
 3. validar/processar a imagem;
 4. enviar o objeto ao S3;
-5. construir a URL estável;
+5. construir a URL estável da rota pública da API;
 6. criar `Media` no Prisma com `source` e `storageKey`;
 7. retornar `201`.
 
@@ -227,8 +236,8 @@ nunca contra produção.
 
 ### Fase 0 — infraestrutura e decisões
 
-- [ ] Confirmar se `S3_BASE_URL` é bucket público ou CDN.
-- [ ] Definir domínio/CDN e política de leitura estável.
+- [x] Manter o bucket privado e entregar imagens por redirecionamento assinado.
+- [x] Definir URL permanente da API para capas e imagens do corpo.
 - [x] Limite definido em 25 MiB; formatos iniciais JPEG, PNG e WebP.
 - [ ] Validar permissões IAM e CORS.
 
@@ -246,6 +255,8 @@ nunca contra produção.
 - [x] Enviar para `blog/media` com chave imutável.
 - [x] Persistir metadados e implementar compensação.
 - [x] Registrar a rota e mapear erros `413`/`415`.
+- [x] Implementar rota pública que redireciona para URL assinada do S3.
+- [x] Criar migração operacional para URLs S3 já cadastradas.
 
 ### Fase 3 — integração com dashboard
 

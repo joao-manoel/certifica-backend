@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify"
 import { signIn } from "./auth/sign-in"
 import { getProfile } from "./auth/get-profile"
 import { signUp } from "./auth/sign-up"
+import { getMediaFile } from "./blog/media/get-media-file"
 import { updateUser } from "./users/update-user"
 import { updateUserPassword } from "./users/update-user-password"
 import { createPost } from "./blog/post/create-post"
@@ -70,6 +71,7 @@ export async function routes(app: FastifyInstance) {
   app.register(createMedia)
   app.register(uploadMedia)
   app.register(listMedia)
+  app.register(getMediaFile)
 
   // INTEGRAÇÕES
   app.register(apiClients)
