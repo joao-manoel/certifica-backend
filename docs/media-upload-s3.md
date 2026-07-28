@@ -148,18 +148,18 @@ Para a primeira versão:
 - rejeitar arquivo vazio, múltiplos arquivos e dimensões inválidas;
 - gerar o nome no servidor; nunca usar o nome original como chave;
 - usar pasta `blog/media`;
+- converter toda imagem aceita para JPEG progressivo;
+- limitar o arquivo armazenado a 950 KB, deixando margem abaixo de 1 MB;
+- começar com dimensão máxima de 2400 px e qualidade 84;
+- reduzir qualidade e, quando necessário, dimensões até atingir o limite;
+- aplicar fundo branco em imagens com transparência durante a conversão;
 - calcular largura, altura e cor dominante no backend;
 - normalizar orientação EXIF antes de salvar metadados.
 
-O projeto ainda não possui `sharp` no backend. Há duas opções:
-
-1. adicionar `sharp` à API para identificar/normalizar imagens e calcular
-   metadados — recomendada;
-2. usar uma biblioteca menor apenas para detecção e deixar alguns metadados
-   nulos — reduz dependência, mas entrega um resultado inferior ao fluxo atual.
-
-Antes de adicionar a dependência, confirmar compatibilidade com a imagem Docker e
-o ambiente de deploy.
+O processamento usa o `sharp` já instalado no backend. A otimização acontece
+antes de `uploadToS3`, portanto o bucket nunca recebe a versão original pesada.
+Os metadados persistidos (`mimeType`, largura, altura e cor dominante) representam
+o arquivo otimizado que foi efetivamente armazenado.
 
 ## Fluxo transacional e compensação
 
@@ -268,6 +268,8 @@ nunca contra produção.
 ### Fase 4 — qualidade e entrega
 
 - [ ] Cobrir validações e compensação com testes.
+- [x] Comprimir automaticamente todo novo upload para no máximo 950 KB.
+- [x] Normalizar JPEG, PNG e WebP para JPEG progressivo antes do S3.
 - [x] Executar build nos dois projetos e lint nos arquivos alterados do dashboard.
 - [ ] Fazer smoke test no bucket de desenvolvimento.
 - [ ] Validar criação e edição de post com URL, upload e galeria.
@@ -277,8 +279,9 @@ nunca contra produção.
 
 - [ ] Exclusão segura de mídia S3.
 - [ ] Paginação/busca completa na galeria.
-- [ ] Redimensionamento e variantes responsivas.
-- [ ] Conversão opcional para WebP/AVIF.
+- [x] Redimensionamento adaptativo para garantir o limite do arquivo original.
+- [ ] Variantes responsivas.
+- [ ] Conversão opcional para WebP/AVIF quando houver suporte de entrega.
 - [ ] Rate limit, malware scan e limpeza de órfãos.
 - [ ] Upload direto com URL pré-assinada se tamanho/escala justificar.
 

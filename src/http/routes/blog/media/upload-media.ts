@@ -24,6 +24,10 @@ import {
   hashPayload,
   saveIdempotentResponse,
 } from "@/lib/idempotency"
+import {
+  type OptimizedBlogImage,
+  optimizeBlogImage,
+} from "@/lib/optimize-blog-image"
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024
 const CACHE_CONTROL = "public, max-age=31536000, immutable"
@@ -141,21 +145,18 @@ export async function uploadMedia(app: FastifyInstance) {
           return reply.code(201).send(replay.response as never)
         }
 
-        let processed: Buffer
-        let info: sharp.OutputInfo
+        let inputInfo: sharp.Metadata
         try {
-          const result = await sharp(uploadedFile.buffer)
-            .rotate()
-            .toBuffer({ resolveWithObject: true })
-          processed = result.data
-          info = result.info
+          inputInfo = await sharp(uploadedFile.buffer, {
+            failOn: "error",
+          }).metadata()
         } catch {
           throw new UnsupportedMediaTypeError(
             "Arquivo inválido. Use uma imagem JPEG, PNG ou WebP.",
           )
         }
 
-        const format = info.format as SupportedFormat
+        const format = inputInfo.format as SupportedFormat
         const detected = MIME_BY_FORMAT[format]
         if (!detected) {
           throw new UnsupportedMediaTypeError(
@@ -168,7 +169,16 @@ export async function uploadMedia(app: FastifyInstance) {
           )
         }
 
-        const stats = await sharp(processed).stats()
+        let optimized: OptimizedBlogImage
+        try {
+          optimized = await optimizeBlogImage(uploadedFile.buffer)
+        } catch {
+          throw new BadRequestError(
+            "Não foi possível otimizar a imagem para menos de 1 MB.",
+          )
+        }
+
+        const stats = await sharp(optimized.buffer).stats()
         const dominantClr = `#${[
           stats.dominant.r,
           stats.dominant.g,
@@ -179,9 +189,9 @@ export async function uploadMedia(app: FastifyInstance) {
 
         const { key } = await uploadToS3(
           {
-            buffer: processed,
-            filename: `upload${detected.extension}`,
-            mimetype: detected.mimeType,
+            buffer: optimized.buffer,
+            filename: `upload${optimized.extension}`,
+            mimetype: optimized.mimeType,
             cacheControl: CACHE_CONTROL,
           },
           "blog/media",
@@ -196,9 +206,9 @@ export async function uploadMedia(app: FastifyInstance) {
               source: "S3",
               storageKey: key,
               alt,
-              mimeType: detected.mimeType,
-              width: info.width,
-              height: info.height,
+              mimeType: optimized.mimeType,
+              width: optimized.width,
+              height: optimized.height,
               dominantClr,
             },
           })
@@ -214,9 +224,11 @@ export async function uploadMedia(app: FastifyInstance) {
           })
           await writeAuditLog(context, "media.upload", "Media", created.id, {
             storageKey: key,
-            mimeType: detected.mimeType,
-            width: info.width,
-            height: info.height,
+            originalMimeType: detected.mimeType,
+            mimeType: optimized.mimeType,
+            width: optimized.width,
+            height: optimized.height,
+            size: optimized.buffer.length,
           })
 
           return reply.code(201).send(response)
