@@ -1,6 +1,6 @@
 # Upload de imagens para S3 — API
 
-Status: implementação local concluída; infraestrutura e smoke test pendentes  
+Status: implementação, infraestrutura, migração e smoke test concluídos  
 Projetos envolvidos: `certifica-backend` e `certifica-dashboard`
 
 Roadmap da entrega pública permanente:

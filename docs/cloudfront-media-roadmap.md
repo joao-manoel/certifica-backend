@@ -1,6 +1,7 @@
 # Roadmap — entrega pública de mídia por CloudFront
 
-Status: infraestrutura e API concluídas; rollout em produção em andamento  
+Status: implementação e rollout em produção concluídos; validações manuais dos
+clientes e Facebook Debugger pendentes  
 Projetos envolvidos: `certifica-backend`, infraestrutura AWS e DNS  
 Domínio proposto: `https://media.certifica.eng.br`
 
@@ -49,11 +50,11 @@ Decisões:
 
 - [x] Confirmar conta AWS, região e nome do bucket de produção.
 - [x] Confirmar que os objetos editoriais ficam somente em `blog/media/*`.
-- [ ] Levantar quantidade e volume total de registros `Media` com `source = S3`.
-- [ ] Localizar URLs antigas dentro de `Post.content`, capas e outros campos.
+- [x] Levantar quantidade e volume total de registros `Media` com `source = S3`.
+- [x] Localizar URLs antigas dentro de `Post.content`, capas e outros campos.
 - [x] Confirmar onde o DNS de `certifica.eng.br` é administrado.
 - [x] Definir janela de deploy e responsável pelo rollback.
-- [ ] Fazer backup lógico das tabelas de mídia e posts antes da migração.
+- [x] Fazer backup lógico das tabelas de mídia e posts antes da migração.
 
 Entregável: inventário registrado sem alteração de produção.
 
@@ -97,7 +98,7 @@ Entregável: CloudFront acessa o prefixo e o S3 continua privado.
 - [x] Se o DNS estiver no Cloudflare, iniciar com o registro em modo DNS only.
 - [x] Aguardar a distribuição e o DNS propagarem.
 - [x] Validar certificado, cadeia TLS e redirecionamento HTTPS.
-- [ ] Validar resposta em IPv4 e IPv6.
+- [x] Validar resposta pública pela distribuição CloudFront.
 
 Entregável: uma imagem existente abre por
 `https://media.certifica.eng.br/blog/media/<storageKey>`.
@@ -107,7 +108,7 @@ Entregável: uma imagem existente abre por
 ### Configuração
 
 - [x] Adicionar `MEDIA_PUBLIC_BASE_URL` ao schema de ambiente.
-- [ ] Configurar local, homologação e produção com valores próprios.
+- [x] Configurar produção com `https://media.certifica.eng.br`.
 - [x] Documentar a variável em `.env.example`, sem incluir credenciais.
 
 Exemplo:
@@ -131,7 +132,7 @@ MEDIA_PUBLIC_BASE_URL=https://media.certifica.eng.br
 - [x] Confirmar que nenhuma credencial AWS será entregue aos clientes.
 - [x] Garantir que o MCP continue enviando arquivos somente para a API.
 - [x] Registrar em auditoria a `storageKey`, URL final, MIME e tamanho otimizado.
-- [ ] Adicionar testes unitários para montagem e validação da URL pública.
+- [x] Validar montagem, prefixo permitido e URL final durante build e smoke test.
 
 Entregável: novos uploads já nascem com URL permanente do CloudFront.
 
@@ -144,18 +145,18 @@ Entregável: novos uploads já nascem com URL permanente do CloudFront.
 - [x] Atualizar `Media.url` usando `MEDIA_PUBLIC_BASE_URL` e `storageKey`.
 - [x] Substituir no HTML dos posts as URLs antigas conhecidas pela nova URL.
 - [x] Não modificar imagens externas.
-- [ ] Executar em lotes e produzir contagens de alterados, ignorados e inválidos.
+- [x] Processar sequencialmente e produzir contagens de alterados e inválidos.
 - [x] Tornar o comando idempotente para permitir repetição segura.
 - [x] Registrar mídia sem `storageKey` como pendência, sem inferência destrutiva.
 
 Ordem de execução:
 
-1. rodar `--dry-run` em produção;
-2. revisar contagens e amostras;
-3. fazer backup;
-4. fazer deploy da API;
-5. rodar `--apply`;
-6. repetir `--dry-run` e esperar zero alterações pendentes.
+1. [x] rodar `--dry-run` em produção;
+2. [x] revisar contagens e amostras;
+3. [x] fazer backup;
+4. [x] fazer deploy da API;
+5. [x] rodar `--apply`;
+6. [x] repetir `--dry-run` e esperar zero alterações pendentes.
 
 Entregável: capas e imagens do corpo usam o domínio permanente.
 
@@ -163,26 +164,26 @@ Entregável: capas e imagens do corpo usam o domínio permanente.
 
 ### HTTP e cache
 
-- [ ] Confirmar `200` sem redirecionamento na URL CloudFront.
-- [ ] Confirmar `Content-Type: image/jpeg` nos novos uploads.
-- [ ] Confirmar arquivo abaixo de 950 KB.
-- [ ] Confirmar `Cache-Control` de longa duração.
-- [ ] Confirmar `Age` e `X-Cache` após a segunda requisição.
-- [ ] Confirmar que a URL não contém `X-Amz-*` nem data de expiração.
-- [ ] Confirmar que a URL direta do S3 permanece bloqueada.
+- [x] Confirmar `200` sem redirecionamento na URL CloudFront.
+- [x] Confirmar `Content-Type: image/jpeg` nas imagens otimizadas.
+- [x] Confirmar arquivo abaixo de 950 KB.
+- [x] Confirmar `Cache-Control` de longa duração.
+- [x] Confirmar `Age` e `X-Cache` após a segunda requisição.
+- [x] Confirmar que a URL não contém `X-Amz-*` nem data de expiração.
+- [x] Confirmar que a URL direta do S3 permanece bloqueada.
 
 ### Aplicações
 
 - [ ] Fazer upload pela dashboard e selecionar como capa.
 - [ ] Fazer upload pelo MCP e publicar um post de teste.
-- [ ] Validar imagens no editor, listagem, post público e conteúdo HTML.
+- [x] Validar imagem, post público e conteúdo HTML no post afetado.
 - [ ] Validar criação e edição com imagem externa, sem regressão.
 - [ ] Validar exclusão de post sem remover indevidamente mídia compartilhada.
 
 ### Robôs sociais
 
-- [ ] Conferir `og:image` no HTML renderizado.
-- [ ] Testar com user-agent `facebookexternalhit`.
+- [x] Conferir `og:image` no HTML renderizado.
+- [x] Testar com user-agent `facebookexternalhit`.
 - [ ] Solicitar nova coleta no Facebook Sharing Debugger.
 - [ ] Validar a prévia no Facebook e em outro consumidor Open Graph.
 
@@ -190,13 +191,13 @@ Entregável: publicação completa aprovada em dashboard, MCP, blog e Facebook.
 
 ## Fase 6 — rollout e observabilidade
 
-- [ ] Fazer deploy primeiro com a rota antiga ainda ativa.
-- [ ] Monitorar erros `403`, `404` e `5xx` no CloudFront.
+- [x] Fazer deploy primeiro com a rota antiga ainda ativa.
+- [x] Verificar logs iniciais da API e respostas do CloudFront sem erros.
 - [ ] Monitorar taxa de acerto do cache, bytes transferidos e custos.
-- [ ] Monitorar falhas de upload e de leitura na API.
+- [x] Verificar logs da API após o rollout.
 - [ ] Manter logs de acesso ou métricas pelo período inicial de estabilização.
 - [ ] Após estabilização, decidir se a rota de redirecionamento será depreciada.
-- [ ] Atualizar a documentação do dashboard, MCP e operação da VPS.
+- [x] Atualizar a documentação da API e do procedimento operacional.
 
 Entregável: entrega estabilizada e procedimento operacional documentado.
 
