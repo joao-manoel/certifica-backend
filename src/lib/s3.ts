@@ -5,6 +5,7 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { randomUUID } from "crypto"
@@ -69,6 +70,32 @@ export async function getSignedGetUrl(key: string, expiresInSeconds = 60) {
     Key: key,
   })
   return getSignedUrl(s3, command, { expiresIn: expiresInSeconds })
+}
+
+export async function getObjectBuffer(key: string) {
+  const response = await s3.send(
+    new GetObjectCommand({
+      Bucket: env.S3_BUCKET_NAME!,
+      Key: key,
+    }),
+  )
+
+  if (!response.Body) {
+    throw new Error(`Objeto S3 sem conteúdo: ${key}`)
+  }
+
+  return Buffer.from(await response.Body.transformToByteArray())
+}
+
+export async function getObjectSize(key: string) {
+  const response = await s3.send(
+    new HeadObjectCommand({
+      Bucket: env.S3_BUCKET_NAME!,
+      Key: key,
+    }),
+  )
+
+  return response.ContentLength ?? 0
 }
 
 // helper para acumular stream -> Buffer (Fastify multipart)

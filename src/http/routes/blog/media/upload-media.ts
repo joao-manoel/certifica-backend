@@ -15,7 +15,7 @@ import {
   mediaResponseSchema,
   serializeMedia,
 } from "@/http/routes/blog/media/media-response"
-import { getMediaDeliveryUrl } from "@/http/routes/blog/media/media-url"
+import { getMediaPublicUrl } from "@/http/routes/blog/media/media-url"
 import { deleteFromS3, streamToBuffer, uploadToS3 } from "@/lib/s3"
 import { prisma } from "@/lib/prisma"
 import { writeAuditLog } from "@/lib/audit"
@@ -202,7 +202,7 @@ export async function uploadMedia(app: FastifyInstance) {
           const created = await prisma.media.create({
             data: {
               id: mediaId,
-              url: getMediaDeliveryUrl(mediaId),
+              url: getMediaPublicUrl(key),
               source: "S3",
               storageKey: key,
               alt,

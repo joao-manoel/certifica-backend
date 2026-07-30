@@ -3,6 +3,9 @@
 Status: implementação local concluída; infraestrutura e smoke test pendentes  
 Projetos envolvidos: `certifica-backend` e `certifica-dashboard`
 
+Roadmap da entrega pública permanente:
+[`cloudfront-media-roadmap.md`](./cloudfront-media-roadmap.md).
+
 ## Objetivo
 
 Permitir que um editor cadastre mídia de duas formas:
@@ -57,30 +60,31 @@ Os dois endpoints retornam HTTP `201` com:
 
 Assim, `GET /blog/media`, `coverId` e os consumidores atuais não mudam.
 
-### URL estável da API com redirecionamento assinado
+### URL pública permanente pelo CloudFront
 
-Posts e capas precisam continuar acessíveis depois que a página foi renderizada.
-O padrão adotado, seguindo a API ArcaRVT, mantém uma URL permanente da API em
-`Media.url`:
+Novos uploads armazenam diretamente em `Media.url` a URL pública e imutável:
 
-`{API_URL}/blog/media/{mediaId}/file`
+`{MEDIA_PUBLIC_BASE_URL}/{storageKey}`
 
-Essa rota pública consulta a `storageKey`, cria uma URL assinada do S3 válida por
-60 segundos e responde com redirecionamento. A resposta de redirecionamento usa
-`Cache-Control: no-store` para impedir que clientes guardem a URL temporária
-depois da expiração.
+Em produção, o resultado segue o formato:
+
+`https://media.certifica.eng.br/blog/media/{uuid}.jpg`
+
+O CloudFront usa OAC para ler o objeto no bucket privado. A rota legada
+`{API_URL}/blog/media/{mediaId}/file` permanece disponível e redireciona para a
+URL pública do CDN, sem gerar uma URL S3 assinada.
 
 Com isso:
 
 - o bucket continua privado;
-- posts nunca armazenam uma URL assinada temporária;
+- posts nunca armazenam uma URL assinada ou temporária;
 - credenciais AWS permanecem somente na API;
-- não é necessário liberar leitura pública nem configurar CloudFront;
-- o navegador recebe a imagem por meio de um redirecionamento seguro.
+- o Facebook recebe a imagem diretamente, sem expiração ou redirecionamento;
+- CloudFront pode manter o objeto em cache usando a chave imutável.
 
-O comando `npm run media:migrate-urls` converte mídias S3 e URLs já inseridas no
-HTML dos posts para o novo endpoint. Em produção, `API_URL` deve conter a URL
-pública HTTPS da API antes de executar o comando.
+O comando `npm run media:migrate-cloudfront-urls` opera em dry-run por padrão.
+Depois da revisão, `npm run media:migrate-cloudfront-urls -- --apply` atualiza
+registros `Media` e URLs inseridas no HTML dos posts.
 
 ### Registrar a origem e a chave
 
@@ -255,7 +259,7 @@ nunca contra produção.
 - [x] Enviar para `blog/media` com chave imutável.
 - [x] Persistir metadados e implementar compensação.
 - [x] Registrar a rota e mapear erros `413`/`415`.
-- [x] Implementar rota pública que redireciona para URL assinada do S3.
+- [x] Manter rota legada que redireciona para a URL pública do CDN.
 - [x] Criar migração operacional para URLs S3 já cadastradas.
 
 ### Fase 3 — integração com dashboard

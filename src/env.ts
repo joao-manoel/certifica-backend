@@ -23,6 +23,7 @@ export const env = createEnv({
     S3_ACCESS_KEY_ID: z.string().min(1),
     S3_SECRET_ACCESS_KEY: z.string().min(1),
     S3_BASE_URL: z.string().min(1),
+    MEDIA_PUBLIC_BASE_URL: z.string().url(),
   },
   runtimeEnv: {
     PORT: process.env.PORT,
@@ -41,5 +42,6 @@ export const env = createEnv({
     S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
     S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
     S3_BASE_URL: process.env.S3_BASE_URL,
+    MEDIA_PUBLIC_BASE_URL: process.env.MEDIA_PUBLIC_BASE_URL,
   },
 })

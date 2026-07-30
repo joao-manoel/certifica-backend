@@ -11,7 +11,8 @@
     "format": "prettier --write .",
     "build": "tsc && tsc-alias",
     "api-client:create": "tsx --require tsconfig-paths/register scripts/create-api-client.ts",
-    "media:migrate-urls": "tsx --require tsconfig-paths/register scripts/migrate-s3-media-urls.ts"
+    "media:migrate-cloudfront-urls": "tsx --require tsconfig-paths/register scripts/migrate-cloudfront-media-urls.ts",
+    "media:optimize-existing": "tsx --require tsconfig-paths/register scripts/optimize-existing-s3-media.ts"
   },
   "keywords": [],
   "author": "Joao-manoel",

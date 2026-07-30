@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Public CloudFront delivery for Certifica blog media in a private S3 bucket
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: certifica-bucket
+    Description: Existing private S3 bucket
+  BucketRegion:
+    Type: String
+    Default: us-east-2
+    Description: Region of the existing S3 bucket
+  MediaDomainName:
+    Type: String
+    Default: media.certifica.eng.br
+    Description: Public domain used to deliver blog media
+  CertificateArn:
+    Type: String
+    Description: ACM certificate ARN in us-east-1
+
+Resources:
+  MediaOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Description: Access Certifica blog media in the private S3 bucket
+        Name: certifica-blog-media-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  MediaDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - !Ref MediaDomainName
+        Comment: Certifica public blog media
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          CachedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          Compress: true
+          TargetOriginId: certifica-blog-media-s3
+          ViewerProtocolPolicy: redirect-to-https
+        Enabled: true
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        Origins:
+          - DomainName: !Sub ${BucketName}.s3.${BucketRegion}.amazonaws.com
+            Id: certifica-blog-media-s3
+            OriginAccessControlId: !GetAtt MediaOriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        PriceClass: PriceClass_200
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+      Tags:
+        - Key: Project
+          Value: Certifica
+        - Key: Component
+          Value: blog-media
+
+  MediaBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BucketName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !Sub arn:${AWS::Partition}:s3:::${BucketName}
+              - !Sub arn:${AWS::Partition}:s3:::${BucketName}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+          - Sid: AllowCloudFrontReadBlogMedia
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub arn:${AWS::Partition}:s3:::${BucketName}/blog/media/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${MediaDistribution}
+
+Outputs:
+  DistributionId:
+    Description: CloudFront distribution ID
+    Value: !Ref MediaDistribution
+  DistributionDomainName:
+    Description: CloudFront domain to use as the DNS CNAME target
+    Value: !GetAtt MediaDistribution.DomainName
+  MediaBaseUrl:
+    Description: Public base URL used by the Certifica API
+    Value: !Sub https://${MediaDomainName}

@@ -3,7 +3,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod"
 import { z } from "zod"
 
 import { NotFoundError } from "@/http/_errors/not-found-error"
-import { getSignedGetUrl } from "@/lib/s3"
+import { getMediaPublicUrl } from "@/http/routes/blog/media/media-url"
 import { prisma } from "@/lib/prisma"
 
 export async function getMediaFile(app: FastifyInstance) {
@@ -12,7 +12,7 @@ export async function getMediaFile(app: FastifyInstance) {
     {
       schema: {
         tags: ["Media"],
-        summary: "Redirect to a temporary signed URL for an S3 image",
+        summary: "Redirect a legacy media URL to its public CDN URL",
         params: z.object({
           id: z.string().uuid(),
         }),
@@ -31,11 +31,11 @@ export async function getMediaFile(app: FastifyInstance) {
         throw new NotFoundError("Mídia não encontrada.")
       }
 
-      const signedUrl = await getSignedGetUrl(media.storageKey)
+      const publicUrl = getMediaPublicUrl(media.storageKey)
 
       return reply
-        .header("Cache-Control", "no-store, private")
-        .redirect(signedUrl)
+        .header("Cache-Control", "public, max-age=3600")
+        .redirect(publicUrl)
     },
   )
 }

@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: TLS certificate for the Certifica public media domain
+
+Parameters:
+  MediaDomainName:
+    Type: String
+    Default: media.certifica.eng.br
+    Description: Public domain used to deliver blog media
+
+Resources:
+  MediaCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref MediaDomainName
+      ValidationMethod: DNS
+      Tags:
+        - Key: Project
+          Value: Certifica
+        - Key: Component
+          Value: blog-media
+
+Outputs:
+  CertificateArn:
+    Description: ACM certificate ARN for the CloudFront distribution
+    Value: !Ref MediaCertificate
+  MediaDomainName:
+    Description: Domain covered by the certificate
+    Value: !Ref MediaDomainName
