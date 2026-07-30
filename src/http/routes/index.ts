@@ -9,6 +9,7 @@ import { createPost } from "./blog/post/create-post"
 import { createMedia } from "./blog/media/create-media"
 import { listMedia } from "./blog/media/list-media"
 import { listPublicPosts } from "./blog/post/list-public-posts"
+import { listPublicCategories } from "./blog/post/list-public-categories"
 import { searchPosts } from "./blog/post/search-posts"
 import { getPost } from "./blog/post/get-post"
 import { deletePost } from "./blog/post/delete-post"
@@ -27,6 +28,7 @@ import { getMetrics } from "./blog/post/metrics/get-metrics"
 import { setAvatar } from "./users/set-avatar"
 import { getUserAvatarByUsername } from "./users/get-user-avatar-by-username"
 import { uploadMedia } from "./blog/media/upload-media"
+import { manageMedia } from "./blog/media/manage-media"
 import { validatePost } from "./blog/post/validate-post"
 import { apiClients } from "./integrations/api-clients"
 
@@ -51,6 +53,7 @@ export async function routes(app: FastifyInstance) {
   app.register(getPostById)
   //rotas publicas
   app.register(listPublicPosts)
+  app.register(listPublicCategories)
   app.register(searchPosts)
   app.register(getPost)
   app.register(getRelatedPosts)
@@ -72,6 +75,7 @@ export async function routes(app: FastifyInstance) {
   app.register(uploadMedia)
   app.register(listMedia)
   app.register(getMediaFile)
+  app.register(manageMedia)
 
   // INTEGRAÇÕES
   app.register(apiClients)

@@ -205,11 +205,27 @@ export async function uploadMedia(app: FastifyInstance) {
               url: getMediaPublicUrl(key),
               source: "S3",
               storageKey: key,
+              originalFilename: uploadedFile.filename,
+              fileSizeBytes: optimized.buffer.length,
+              createdById: userId,
               alt,
               mimeType: optimized.mimeType,
               width: optimized.width,
               height: optimized.height,
               dominantClr,
+              versions: {
+                create: {
+                  id: randomUUID(),
+                  url: getMediaPublicUrl(key),
+                  storageKey: key,
+                  mimeType: optimized.mimeType,
+                  width: optimized.width,
+                  height: optimized.height,
+                  fileSizeBytes: optimized.buffer.length,
+                  dominantClr,
+                  isCurrent: true,
+                },
+              },
             },
           })
 

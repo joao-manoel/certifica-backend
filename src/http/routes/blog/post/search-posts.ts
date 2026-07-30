@@ -57,7 +57,23 @@ export async function searchPosts(app: FastifyInstance) {
                   id: z.string().uuid(),
                   name: z.string(),
                   username: z.string(),
+                  hasAvatar: z.boolean(),
+                  bio: z.string().nullable(),
                 }),
+                categories: z.array(
+                  z.object({
+                    id: z.string().uuid(),
+                    name: z.string(),
+                    slug: z.string(),
+                  }),
+                ),
+                tags: z.array(
+                  z.object({
+                    id: z.string().uuid(),
+                    name: z.string(),
+                    slug: z.string(),
+                  }),
+                ),
               }),
             ),
           }),
@@ -155,8 +171,26 @@ export async function searchPosts(app: FastifyInstance) {
           take: pageSize,
           orderBy,
           include: {
-            author: { select: { id: true, name: true, username: true } },
+            author: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatarKey: true,
+                description: true,
+              },
+            },
             cover: { select: { url: true } },
+            categories: {
+              select: {
+                category: { select: { id: true, name: true, slug: true } },
+              },
+            },
+            tags: {
+              select: {
+                tag: { select: { id: true, name: true, slug: true } },
+              },
+            },
           },
         }),
       ])
@@ -179,7 +213,15 @@ export async function searchPosts(app: FastifyInstance) {
           coverUrl: p.cover?.url ?? null,
           createdAt: p.createdAt.toISOString(),
           updatedAt: p.updatedAt.toISOString(),
-          author: p.author,
+          author: {
+            id: p.author.id,
+            name: p.author.name,
+            username: p.author.username,
+            hasAvatar: !!p.author.avatarKey,
+            bio: p.author.description,
+          },
+          categories: p.categories.map(({ category }) => category),
+          tags: p.tags.map(({ tag }) => tag),
         })),
       })
     },

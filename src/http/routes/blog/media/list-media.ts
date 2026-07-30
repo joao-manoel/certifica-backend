@@ -25,6 +25,7 @@ export async function listMedia(app: FastifyInstance) {
             perPage: z.coerce.number().int().min(1).max(100).default(20),
             q: z.string().trim().min(1).max(200).optional(), // busca em url/alt/mimeType
             mimeType: z.string().trim().max(100).optional(),
+            source: z.enum(["EXTERNAL", "S3"]).optional(),
             orderBy: z
               .enum(
                 new Set(ORDER_FIELDS) as unknown as [
@@ -48,13 +49,21 @@ export async function listMedia(app: FastifyInstance) {
                 z.object({
                   id: z.string().uuid(),
                   url: z.string().url(),
+                  source: z.enum(["EXTERNAL", "S3"]),
+                  storageKey: z.string().nullable(),
+                  title: z.string().nullable(),
                   alt: z.string().nullable(),
+                  caption: z.string().nullable(),
+                  credit: z.string().nullable(),
+                  originalFilename: z.string().nullable(),
+                  fileSizeBytes: z.number().int().nullable(),
                   mimeType: z.string().nullable(),
                   width: z.number().int().nullable(),
                   height: z.number().int().nullable(),
                   dominantClr: z.string().nullable(),
                   createdAt: z.string().datetime(),
                   updatedAt: z.string().datetime(),
+                  usageCount: z.number().int(),
                 }),
               ),
             }),
@@ -76,17 +85,28 @@ export async function listMedia(app: FastifyInstance) {
           )
         }
 
-        const { page, perPage, q, mimeType, orderBy, sort, ids } = request.query
+        const { page, perPage, q, mimeType, source, orderBy, sort, ids } =
+          request.query
 
         const where = {
           AND: [
             ids && ids.length > 0 ? { id: { in: ids } } : undefined,
             mimeType ? { mimeType: { equals: mimeType } } : undefined,
+            source ? { source: { equals: source } } : undefined,
             q
               ? {
                   OR: [
                     { url: { contains: q, mode: "insensitive" as const } },
+                    { title: { contains: q, mode: "insensitive" as const } },
                     { alt: { contains: q, mode: "insensitive" as const } },
+                    { caption: { contains: q, mode: "insensitive" as const } },
+                    { credit: { contains: q, mode: "insensitive" as const } },
+                    {
+                      originalFilename: {
+                        contains: q,
+                        mode: "insensitive" as const,
+                      },
+                    },
                     { mimeType: { contains: q, mode: "insensitive" as const } },
                   ],
                 }
@@ -104,7 +124,14 @@ export async function listMedia(app: FastifyInstance) {
             select: {
               id: true,
               url: true,
+              source: true,
+              storageKey: true,
+              title: true,
               alt: true,
+              caption: true,
+              credit: true,
+              originalFilename: true,
+              fileSizeBytes: true,
               mimeType: true,
               width: true,
               height: true,
@@ -115,16 +142,31 @@ export async function listMedia(app: FastifyInstance) {
           }),
         ])
 
+        const posts = await prisma.post.findMany({
+          select: { coverId: true, content: true },
+        })
         const items = rows.map((m) => ({
           id: m.id,
           url: m.url,
+          source: m.source,
+          storageKey: m.storageKey,
+          title: m.title,
           alt: m.alt,
+          caption: m.caption,
+          credit: m.credit,
+          originalFilename: m.originalFilename,
+          fileSizeBytes: m.fileSizeBytes,
           mimeType: m.mimeType,
           width: m.width,
           height: m.height,
           dominantClr: m.dominantClr,
           createdAt: m.createdAt.toISOString(),
           updatedAt: m.updatedAt.toISOString(),
+          usageCount: posts.reduce((count, post) => {
+            const coverUse = post.coverId === m.id ? 1 : 0
+            const bodyUse = JSON.stringify(post.content).includes(m.url) ? 1 : 0
+            return count + coverUse + bodyUse
+          }, 0),
         }))
 
         const totalPages = Math.max(1, Math.ceil(total / perPage))

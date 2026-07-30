@@ -12,6 +12,7 @@ import {
   mediaResponseSchema,
   serializeMedia,
 } from "@/http/routes/blog/media/media-response"
+import { writeAuditLog } from "@/lib/audit"
 
 export async function createMedia(app: FastifyInstance) {
   app
@@ -25,7 +26,10 @@ export async function createMedia(app: FastifyInstance) {
           summary: "Create media (image) record",
           body: z.object({
             url: z.string().url().max(2048),
+            title: z.string().max(160).optional().nullable(),
             alt: z.string().max(200).optional().nullable(),
+            caption: z.string().max(500).optional().nullable(),
+            credit: z.string().max(300).optional().nullable(),
             mimeType: z.string().max(100).optional().nullable(),
             width: z.number().int().positive().optional().nullable(),
             height: z.number().int().positive().optional().nullable(),
@@ -37,7 +41,8 @@ export async function createMedia(app: FastifyInstance) {
         },
       },
       async (request, reply) => {
-        const userId = await request.getCurrentUserId()
+        const context = await request.requireScopes(["media:write"])
+        const userId = context.userId
 
         const user = await prisma.user.findUnique({
           where: { id: userId },
@@ -51,7 +56,17 @@ export async function createMedia(app: FastifyInstance) {
           )
         }
 
-        const { url, alt, mimeType, width, height, dominantClr } = request.body
+        const {
+          url,
+          title,
+          alt,
+          caption,
+          credit,
+          mimeType,
+          width,
+          height,
+          dominantClr,
+        } = request.body
 
         // normalizações/validações adicionais
         const normalizedClr = normalizeHexColor(dominantClr)
@@ -76,7 +91,11 @@ export async function createMedia(app: FastifyInstance) {
           data: {
             url,
             source: "EXTERNAL",
+            title: title ?? null,
             alt: alt ?? null,
+            caption: caption ?? null,
+            credit: credit ?? null,
+            createdById: userId,
             mimeType: finalMime,
             width: width ?? null,
             height: height ?? null,
@@ -84,6 +103,10 @@ export async function createMedia(app: FastifyInstance) {
           },
         })
 
+        await writeAuditLog(context, "media.create", "Media", created.id, {
+          source: created.source,
+          url: created.url,
+        })
         return reply.code(201).send(serializeMedia(created))
       },
     )

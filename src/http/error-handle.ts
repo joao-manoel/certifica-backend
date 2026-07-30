@@ -6,6 +6,7 @@ import { UnauthorizedError } from "@/http/_errors/unauthorized-error"
 import { NotFoundError } from "@/http/_errors/not-found-error"
 import { PayloadTooLargeError } from "@/http/_errors/payload-too-large-error"
 import { UnsupportedMediaTypeError } from "@/http/_errors/unsupported-media-type-error"
+import { ConflictError } from "@/http/_errors/conflict-error"
 
 type FastifyErrorHandler = FastifyInstance["errorHandler"]
 
@@ -32,6 +33,13 @@ export const errorHandler: FastifyErrorHandler = (error, request, reply) => {
   if (error instanceof NotFoundError) {
     return reply.status(404).send({
       message: error.message,
+    })
+  }
+
+  if (error instanceof ConflictError) {
+    return reply.status(409).send({
+      message: error.message,
+      ...(error as ConflictError).details,
     })
   }
 

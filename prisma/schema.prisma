@@ -50,6 +50,7 @@ model User {
   Comment    Comment[]
   apiClients ApiClient[]
   auditLogs  AuditLog[]
+  media      Media[]
 }
 
 model Post {
@@ -235,20 +236,49 @@ model UtmCampaign {
 }
 
 model Media {
-  id          String      @id @default(uuid())
-  url         String
-  source      MediaSource @default(EXTERNAL)
-  storageKey  String?     @unique
-  alt         String?     @db.VarChar(500)
-  mimeType    String?     @db.VarChar(100)
-  width       Int?
-  height      Int?
-  dominantClr String?     @db.VarChar(12)
+  id               String      @id @default(uuid())
+  url              String
+  source           MediaSource @default(EXTERNAL)
+  storageKey       String?     @unique
+  title            String?     @db.VarChar(160)
+  alt              String?     @db.VarChar(500)
+  caption          String?     @db.VarChar(500)
+  credit           String?     @db.VarChar(300)
+  originalFilename String?     @db.VarChar(255)
+  fileSizeBytes    Int?
+  mimeType         String?     @db.VarChar(100)
+  width            Int?
+  height           Int?
+  dominantClr      String?     @db.VarChar(12)
+  createdById      String?
+  createdBy        User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  Post Post[]
+  Post     Post[]
+  versions MediaVersion[]
+
+  @@index([source, createdAt])
+  @@index([createdById])
+}
+
+model MediaVersion {
+  id            String   @id @default(uuid())
+  mediaId       String
+  media         Media    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  url           String   @unique
+  storageKey    String   @unique
+  mimeType      String   @db.VarChar(100)
+  width         Int
+  height        Int
+  fileSizeBytes Int
+  dominantClr   String?  @db.VarChar(12)
+  isCurrent     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([mediaId, createdAt])
+  @@index([mediaId, isCurrent])
 }
 
 model Category {
