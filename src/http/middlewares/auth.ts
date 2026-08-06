@@ -30,7 +30,21 @@ export const auth = fastifyPlugin(async (app: FastifyInstance) => {
       if (!token) throw new UnauthorizedError("Token obrigatório.")
 
       try {
-        const { sub } = await request.jwtVerify<{ sub: string }>()
+        const { sub, sessionVersion } = await request.jwtVerify<{
+          sub: string
+          sessionVersion?: number
+        }>()
+        const user = await prisma.user.findUnique({
+          where: { id: sub },
+          select: { isActive: true, sessionVersion: true },
+        })
+        if (
+          !user ||
+          !user.isActive ||
+          sessionVersion !== user.sessionVersion
+        ) {
+          throw new UnauthorizedError("Sessão inválida ou expirada.")
+        }
         cachedContext = {
           userId: sub,
           apiClientId: null,

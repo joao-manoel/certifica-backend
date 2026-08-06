@@ -39,6 +39,10 @@ model User {
   role      Role     @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  isActive          Boolean   @default(true)
+  mustChangePassword Boolean  @default(false)
+  passwordChangedAt DateTime?
+  sessionVersion    Int       @default(1)
 
   description String? @db.VarChar(500)
 
@@ -51,6 +55,8 @@ model User {
   apiClients ApiClient[]
   auditLogs  AuditLog[]
   media      Media[]
+
+  @@index([role, isActive])
 }
 
 model Post {

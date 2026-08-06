@@ -80,7 +80,12 @@ export async function updateUserPassword(app: FastifyInstance) {
 
         const updated = await prisma.user.update({
           where: { id: user.id },
-          data: { password: hashed },
+          data: {
+            password: hashed,
+            passwordChangedAt: new Date(),
+            mustChangePassword: false,
+            sessionVersion: { increment: 1 },
+          },
           select: { id: true, updatedAt: true },
         })
 

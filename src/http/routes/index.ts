@@ -31,6 +31,7 @@ import { uploadMedia } from "./blog/media/upload-media"
 import { manageMedia } from "./blog/media/manage-media"
 import { validatePost } from "./blog/post/validate-post"
 import { apiClients } from "./integrations/api-clients"
+import { adminUsers } from "./users/admin-users"
 
 export async function routes(app: FastifyInstance) {
   //ROTA PARA AUTHENTICAÇÃO
@@ -43,6 +44,7 @@ export async function routes(app: FastifyInstance) {
   app.register(updateUserPassword)
   app.register(setAvatar)
   app.register(getUserAvatarByUsername)
+  app.register(adminUsers)
 
   //ROTA DO POST
   //rota privadas

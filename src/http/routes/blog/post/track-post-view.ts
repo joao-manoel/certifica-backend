@@ -54,7 +54,7 @@ export async function trackPostView(app: FastifyInstance) {
         post.status !== PostStatus.PUBLISHED ||
         post.visibility !== Visibility.PUBLIC
       ) {
-        return reply.code(204).send()
+        return reply.code(204).send(null)
       }
 
       const day = yyyymmdd()
@@ -84,7 +84,7 @@ export async function trackPostView(app: FastifyInstance) {
       // 2) bots não contam: apaga a view e finaliza
       if (bot) {
         await prisma.postView.delete({ where: { id: view.id } })
-        return reply.code(204).send()
+        return reply.code(204).send(null)
       }
 
       // 3) dedupe diária no Redis
@@ -111,7 +111,7 @@ export async function trackPostView(app: FastifyInstance) {
         await prisma.postView.delete({ where: { id: view.id } })
       }
 
-      return reply.code(204).send()
+      return reply.code(204).send(null)
     },
   )
 }

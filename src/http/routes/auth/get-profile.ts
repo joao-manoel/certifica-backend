@@ -27,6 +27,7 @@ export async function getProfile(app: FastifyInstance) {
                 email: z.string().email().nullable(),
                 description: z.string().nullable(),
                 role: z.nativeEnum(Role),
+                mustChangePassword: z.boolean(),
               }),
             }),
           },
@@ -43,6 +44,7 @@ export async function getProfile(app: FastifyInstance) {
             name: true,
             email: true,
             role: true,
+            mustChangePassword: true,
           },
           where: {
             id: userId,
@@ -61,6 +63,7 @@ export async function getProfile(app: FastifyInstance) {
             email: user.email,
             description: user.description,
             role: user.role,
+            mustChangePassword: user.mustChangePassword,
           },
         })
       },

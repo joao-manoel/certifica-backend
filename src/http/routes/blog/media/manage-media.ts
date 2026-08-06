@@ -387,7 +387,7 @@ export async function manageMedia(app: FastifyInstance) {
         storageKeys: keys,
         storageDeleteFailures: failures,
       })
-      return reply.code(204).send()
+      return reply.code(204).send(null)
     },
   )
 }

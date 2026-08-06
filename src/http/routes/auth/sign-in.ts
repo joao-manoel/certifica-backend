@@ -38,6 +38,10 @@ export async function signIn(app: FastifyInstance) {
         throw new UnauthorizedError("username ou senha inválidos.")
       }
 
+      if (!user.isActive) {
+        throw new UnauthorizedError("Esta conta está inativa.")
+      }
+
       const isValid = await bcrypt.compare(password, user.password)
 
       if (!isValid) {
@@ -53,6 +57,7 @@ export async function signIn(app: FastifyInstance) {
       const token = await reply.jwtSign(
         {
           sub: user.id,
+          sessionVersion: user.sessionVersion,
         },
         {
           sign: {

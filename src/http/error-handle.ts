@@ -7,10 +7,12 @@ import { NotFoundError } from "@/http/_errors/not-found-error"
 import { PayloadTooLargeError } from "@/http/_errors/payload-too-large-error"
 import { UnsupportedMediaTypeError } from "@/http/_errors/unsupported-media-type-error"
 import { ConflictError } from "@/http/_errors/conflict-error"
+import { ForbiddenError } from "@/http/_errors/forbidden-error"
 
 type FastifyErrorHandler = FastifyInstance["errorHandler"]
 
 export const errorHandler: FastifyErrorHandler = (error, request, reply) => {
+  const fastifyError = error as Error & { code?: string }
   if (error instanceof ZodError) {
     return reply.status(400).send({
       message: "Validation error",
@@ -30,6 +32,10 @@ export const errorHandler: FastifyErrorHandler = (error, request, reply) => {
     })
   }
 
+  if (error instanceof ForbiddenError) {
+    return reply.status(403).send({ message: error.message })
+  }
+
   if (error instanceof NotFoundError) {
     return reply.status(404).send({
       message: error.message,
@@ -45,10 +51,10 @@ export const errorHandler: FastifyErrorHandler = (error, request, reply) => {
 
   if (
     error instanceof PayloadTooLargeError ||
-    error.code === "FST_REQ_FILE_TOO_LARGE"
+    fastifyError.code === "FST_REQ_FILE_TOO_LARGE"
   ) {
     return reply.status(413).send({
-      message: error.message || "Arquivo excede o limite permitido.",
+      message: fastifyError.message || "Arquivo excede o limite permitido.",
     })
   }
 
@@ -59,9 +65,9 @@ export const errorHandler: FastifyErrorHandler = (error, request, reply) => {
   }
 
   if (
-    error.code === "FST_FILES_LIMIT" ||
-    error.code === "FST_FIELDS_LIMIT" ||
-    error.code === "FST_PARTS_LIMIT"
+    fastifyError.code === "FST_FILES_LIMIT" ||
+    fastifyError.code === "FST_FIELDS_LIMIT" ||
+    fastifyError.code === "FST_PARTS_LIMIT"
   ) {
     return reply.status(400).send({
       message: "Limite de campos ou arquivos excedido.",
