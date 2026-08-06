@@ -12,6 +12,10 @@ const USER_SCOPES: EditorScope[] = [
   "posts:publish",
   "media:read",
   "media:write",
+  "portfolio:read",
+  "portfolio:write",
+  "portfolio:publish",
+  "portfolio:categories",
 ]
 
 function getBearerToken(authorization?: string) {

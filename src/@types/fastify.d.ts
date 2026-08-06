@@ -6,6 +6,10 @@ export type EditorScope =
   | "posts:publish"
   | "media:read"
   | "media:write"
+  | "portfolio:read"
+  | "portfolio:write"
+  | "portfolio:publish"
+  | "portfolio:categories"
 
 export type EditorContext = {
   userId: string
