@@ -20,9 +20,8 @@ const mediaSelect = {
 const categorySelect = { id: true, name: true, slug: true } satisfies Prisma.PortfolioCategorySelect
 
 const projectPayload = z.object({
-  title: z.string().trim().min(3).max(160),
-  slug: z.string().trim().max(140).optional(),
-  summary: z.string().trim().min(20).max(500),
+  title: z.string().trim().min(3, "O título precisa ter pelo menos 3 caracteres.").max(160, "O título pode ter no máximo 160 caracteres."),
+  summary: z.string().trim().min(20, "O resumo precisa ter pelo menos 20 caracteres.").max(500, "O resumo pode ter no máximo 500 caracteres."),
   content: editorContentSchema,
   status: z.nativeEnum(PortfolioProjectStatus).default(PortfolioProjectStatus.DRAFT),
   featured: z.boolean().default(false),
@@ -160,7 +159,7 @@ export async function adminPortfolio(app: FastifyInstance) {
       const actor = await editor(request, ["portfolio:write"])
       const data = projectPayload.parse(request.body)
       if (data.status === PortfolioProjectStatus.PUBLISHED) await request.requireScopes(["portfolio:publish"])
-      const slug = await uniqueSlug(data.slug || data.title)
+      const slug = await uniqueSlug(data.title)
       const content = sanitizeEditorContent(data.content)
       const project = await prisma.$transaction(async (tx) => {
         const created = await tx.portfolioProject.create({ data: { title: data.title, slug, summary: data.summary, content, status: data.status, publishedAt: data.status === PortfolioProjectStatus.PUBLISHED ? new Date() : null, featured: data.featured, displayOrder: data.displayOrder, location: data.location, architects: data.architects, areaSquareMeters: data.areaSquareMeters, completionYear: data.completionYear, clientName: data.clientName, servicesProvided: data.servicesProvided, seoTitle: data.seoTitle, metaDescription: data.metaDescription, coverId: data.coverId, createdById: actor.user.id } })
@@ -180,8 +179,8 @@ export async function adminPortfolio(app: FastifyInstance) {
       if (!existing) throw new NotFoundError("Projeto não encontrado.")
       if (data.expectedVersion && data.expectedVersion !== existing.version) throw new ConflictError(`Conflito de versão. Atual: ${existing.version}.`)
       if (data.status === PortfolioProjectStatus.PUBLISHED) await request.requireScopes(["portfolio:publish"])
-      const { categoryIds, galleryMediaIds, expectedVersion: _expectedVersion, content, slug: requestedSlug, ...fields } = data
-      const patch: Prisma.PortfolioProjectUpdateInput = { ...fields, ...(requestedSlug !== undefined ? { slug: await uniqueSlug(requestedSlug, id) } : {}), ...(content ? { content: sanitizeEditorContent(content) } : {}), ...(data.status ? { publishedAt: data.status === PortfolioProjectStatus.PUBLISHED ? existing.publishedAt ?? new Date() : null } : {}), version: { increment: 1 } }
+      const { categoryIds, galleryMediaIds, expectedVersion: _expectedVersion, content, ...fields } = data
+      const patch: Prisma.PortfolioProjectUpdateInput = { ...fields, ...(data.title !== undefined && data.title !== existing.title ? { slug: await uniqueSlug(data.title, id) } : {}), ...(content ? { content: sanitizeEditorContent(content) } : {}), ...(data.status ? { publishedAt: data.status === PortfolioProjectStatus.PUBLISHED ? existing.publishedAt ?? new Date() : null } : {}), version: { increment: 1 } }
       const project = await prisma.$transaction(async (tx) => {
         await tx.portfolioProject.update({ where: { id }, data: patch })
         if (categoryIds) { await tx.portfolioCategoryOnProjects.deleteMany({ where: { projectId: id } }); if (categoryIds.length) await tx.portfolioCategoryOnProjects.createMany({ data: [...new Set(categoryIds)].map((categoryId) => ({ projectId: id, categoryId })) }) }
