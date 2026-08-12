@@ -100,6 +100,8 @@ export async function manageMedia(app: FastifyInstance) {
                 width: z.number().int(),
                 height: z.number().int(),
                 fileSizeBytes: z.number().int(),
+                operation: z.unknown().nullable(),
+                createdBy: z.object({ id: z.string().uuid(), name: z.string() }).nullable(),
                 isCurrent: z.boolean(),
                 createdAt: z.string().datetime(),
               }),
@@ -112,7 +114,7 @@ export async function manageMedia(app: FastifyInstance) {
       await requireMediaEditor(request)
       const media = await prisma.media.findUnique({
         where: { id: request.params.id },
-        include: { versions: { orderBy: { createdAt: "desc" } } },
+        include: { versions: { orderBy: { createdAt: "desc" }, include: { createdBy: { select: { id: true, name: true } } } } },
       })
       if (!media) throw new NotFoundError("Mídia não encontrada.")
       const usages = await findMediaUsages(media.id, [
@@ -135,6 +137,7 @@ export async function manageMedia(app: FastifyInstance) {
         usages,
         versions: media.versions.map((version) => ({
           ...version,
+          operation: version.operation ?? null,
           createdAt: version.createdAt.toISOString(),
         })),
       })
@@ -226,9 +229,21 @@ export async function manageMedia(app: FastifyInstance) {
         .parse(fields.rotate ?? 0)
       const source =
         replacement?.buffer ?? (await getObjectBuffer(current.storageKey))
-      let pipeline = sharp(source, { failOn: "error" }).rotate(rotate)
+      const sourceMetadata = await sharp(source, { failOn: "error" })
+        .rotate()
+        .metadata()
+      const orientedWidth = sourceMetadata.width
+      const orientedHeight = sourceMetadata.height
+      if (!orientedWidth || !orientedHeight) {
+        throw new BadRequestError("Não foi possível identificar as dimensões da imagem.")
+      }
+      const transformedWidth = rotate === 90 || rotate === 270 ? orientedHeight : orientedWidth
+      const transformedHeight = rotate === 90 || rotate === 270 ? orientedWidth : orientedHeight
+      let pipeline = sharp(source, { failOn: "error" }).rotate().rotate(rotate)
       if (fields.flipHorizontal === "true") pipeline = pipeline.flop()
       if (fields.flipVertical === "true") pipeline = pipeline.flip()
+      let cropOperation: { left: number; top: number; width: number; height: number } | null = null
+      const editorCrop = fields.editorCropLeft !== undefined ? z.object({ left: z.coerce.number().int().min(0), top: z.coerce.number().int().min(0), width: z.coerce.number().int().positive(), height: z.coerce.number().int().positive() }).parse({ left: fields.editorCropLeft, top: fields.editorCropTop, width: fields.editorCropWidth, height: fields.editorCropHeight }) : null
       if (fields.cropLeft !== undefined) {
         const crop = z
           .object({
@@ -243,6 +258,15 @@ export async function manageMedia(app: FastifyInstance) {
             width: fields.cropWidth,
             height: fields.cropHeight,
           })
+        if (crop.left + crop.width > transformedWidth || crop.top + crop.height > transformedHeight) {
+          throw new BadRequestError(
+            `O recorte ultrapassa os limites da imagem (${transformedWidth} × ${transformedHeight} px).`,
+          )
+        }
+        if (crop.width < 120 || crop.height < 120) {
+          throw new BadRequestError("O recorte precisa ter pelo menos 120 × 120 px.")
+        }
+        cropOperation = crop
         pipeline = pipeline.extract(crop)
       }
 
@@ -263,7 +287,7 @@ export async function manageMedia(app: FastifyInstance) {
       const uploaded = await uploadToS3(
         {
           buffer: optimized.buffer,
-          filename: "transform.jpg",
+          filename: `transform${optimized.extension}`,
           mimetype: optimized.mimeType,
           cacheControl: CACHE_CONTROL,
         },
@@ -274,15 +298,22 @@ export async function manageMedia(app: FastifyInstance) {
         current.url,
         ...current.versions.map((version) => version.url),
       ]
-      const posts = await prisma.post.findMany({
-        select: { id: true, content: true },
-      })
+      const [posts, portfolioProjects] = await Promise.all([
+        prisma.post.findMany({ select: { id: true, content: true } }),
+        prisma.portfolioProject.findMany({ select: { id: true, content: true } }),
+      ])
       const postUpdates = posts
         .map((post) => ({
           id: post.id,
           content: replaceMediaUrls(post.content, historicalUrls, targetUrl),
         }))
         .filter((post) => post.content !== null)
+      const portfolioUpdates = portfolioProjects
+        .map((project) => ({
+          id: project.id,
+          content: replaceMediaUrls(project.content, historicalUrls, targetUrl),
+        }))
+        .filter((project) => project.content !== null)
 
       try {
         await prisma.$transaction([
@@ -301,6 +332,19 @@ export async function manageMedia(app: FastifyInstance) {
               height: optimized.height,
               fileSizeBytes: optimized.buffer.length,
               dominantClr,
+              operation: {
+                type: replacement ? "replace-transform" : "transform",
+                rotate,
+                flipHorizontal: fields.flipHorizontal === "true",
+                flipVertical: fields.flipVertical === "true",
+                crop: cropOperation,
+                editorCrop,
+                sourceWidth: orientedWidth,
+                sourceHeight: orientedHeight,
+                outputWidth: optimized.width,
+                outputHeight: optimized.height,
+              },
+              createdById: context.userId,
               isCurrent: true,
             },
           }),
@@ -324,6 +368,12 @@ export async function manageMedia(app: FastifyInstance) {
               data: { content: post.content! },
             }),
           ),
+          ...portfolioUpdates.map((project) =>
+            prisma.portfolioProject.update({
+              where: { id: project.id },
+              data: { content: project.content! },
+            }),
+          ),
         ])
       } catch (error) {
         await deleteFromS3(uploaded.key).catch(() => undefined)
@@ -338,6 +388,59 @@ export async function manageMedia(app: FastifyInstance) {
         url: updated.url,
         size: optimized.buffer.length,
       })
+      return reply.send(serializeMedia(updated))
+    },
+  )
+
+  secured.post(
+    "/blog/media/:id/versions/:versionId/restore",
+    {
+      schema: {
+        tags: ["Media"],
+        summary: "Restore a historical media version as a new current version",
+        params: z.object({ id: z.string().uuid(), versionId: z.string().uuid() }),
+        response: { 200: mediaResponseSchema },
+      },
+    },
+    async (request, reply) => {
+      const context = await requireMediaEditor(request, true)
+      const current = await prisma.media.findUnique({
+        where: { id: request.params.id },
+        include: { versions: true },
+      })
+      if (!current) throw new NotFoundError("Mídia não encontrada.")
+      const target = current.versions.find((version) => version.id === request.params.versionId)
+      if (!target) throw new NotFoundError("Versão não encontrada.")
+      if (target.isCurrent) throw new BadRequestError("Esta versão já é a versão atual.")
+
+      const buffer = await getObjectBuffer(target.storageKey)
+      const uploaded = await uploadToS3(
+        { buffer, filename: target.mimeType === "image/webp" ? "restore.webp" : "restore.jpg", mimetype: target.mimeType, cacheControl: CACHE_CONTROL },
+        "blog/media",
+      )
+      const targetUrl = getMediaPublicUrl(uploaded.key)
+      const historicalUrls = [current.url, ...current.versions.map((version) => version.url)]
+      const [posts, portfolioProjects] = await Promise.all([
+        prisma.post.findMany({ select: { id: true, content: true } }),
+        prisma.portfolioProject.findMany({ select: { id: true, content: true } }),
+      ])
+      const postUpdates = posts.map((item) => ({ id: item.id, content: replaceMediaUrls(item.content, historicalUrls, targetUrl) })).filter((item) => item.content !== null)
+      const portfolioUpdates = portfolioProjects.map((item) => ({ id: item.id, content: replaceMediaUrls(item.content, historicalUrls, targetUrl) })).filter((item) => item.content !== null)
+
+      try {
+        await prisma.$transaction([
+          prisma.mediaVersion.updateMany({ where: { mediaId: current.id, isCurrent: true }, data: { isCurrent: false } }),
+          prisma.mediaVersion.create({ data: { mediaId: current.id, url: targetUrl, storageKey: uploaded.key, mimeType: target.mimeType, width: target.width, height: target.height, fileSizeBytes: target.fileSizeBytes, dominantClr: target.dominantClr, operation: { type: "restore", restoredFromVersionId: target.id }, createdById: context.userId, isCurrent: true } }),
+          prisma.media.update({ where: { id: current.id }, data: { url: targetUrl, storageKey: uploaded.key, mimeType: target.mimeType, width: target.width, height: target.height, fileSizeBytes: target.fileSizeBytes, dominantClr: target.dominantClr } }),
+          ...postUpdates.map((item) => prisma.post.update({ where: { id: item.id }, data: { content: item.content! } })),
+          ...portfolioUpdates.map((item) => prisma.portfolioProject.update({ where: { id: item.id }, data: { content: item.content! } })),
+        ])
+      } catch (error) {
+        await deleteFromS3(uploaded.key).catch(() => undefined)
+        throw error
+      }
+      const updated = await prisma.media.findUniqueOrThrow({ where: { id: current.id } })
+      await writeAuditLog(context, "media.version.restore", "Media", current.id, { restoredFromVersionId: target.id, previousUrl: current.url, url: targetUrl })
       return reply.send(serializeMedia(updated))
     },
   )

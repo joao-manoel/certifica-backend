@@ -223,6 +223,8 @@ export async function uploadMedia(app: FastifyInstance) {
                   height: optimized.height,
                   fileSizeBytes: optimized.buffer.length,
                   dominantClr,
+                  operation: { type: "upload" },
+                  createdById: userId,
                   isCurrent: true,
                 },
               },

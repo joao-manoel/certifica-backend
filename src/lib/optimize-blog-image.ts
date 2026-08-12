@@ -10,42 +10,36 @@ export type OptimizedBlogImage = {
   buffer: Buffer
   width: number
   height: number
-  mimeType: "image/jpeg"
-  extension: ".jpg"
+  mimeType: "image/jpeg" | "image/webp"
+  extension: ".jpg" | ".webp"
 }
 
 export async function optimizeBlogImage(
   input: Buffer,
 ): Promise<OptimizedBlogImage> {
   const source = sharp(input, { failOn: "error" }).rotate()
+  const preserveTransparency = Boolean((await source.metadata()).hasAlpha)
   let maxDimension = INITIAL_MAX_DIMENSION
   let quality = INITIAL_QUALITY
 
   for (;;) {
-    const result = await source
-      .clone()
-      .resize({
+    let resized = source.clone().resize({
         width: maxDimension,
         height: maxDimension,
         fit: "inside",
         withoutEnlargement: true,
       })
-      .flatten({ background: "#ffffff" })
-      .jpeg({
-        quality,
-        progressive: true,
-        mozjpeg: true,
-        chromaSubsampling: "4:2:0",
-      })
-      .toBuffer({ resolveWithObject: true })
+    const result = preserveTransparency
+      ? await resized.webp({ quality, alphaQuality: 90, effort: 5 }).toBuffer({ resolveWithObject: true })
+      : await resized.flatten({ background: "#ffffff" }).jpeg({ quality, progressive: true, mozjpeg: true, chromaSubsampling: "4:2:0" }).toBuffer({ resolveWithObject: true })
 
     if (result.data.length <= TARGET_FILE_SIZE) {
       return {
         buffer: result.data,
         width: result.info.width,
         height: result.info.height,
-        mimeType: "image/jpeg",
-        extension: ".jpg",
+        mimeType: preserveTransparency ? "image/webp" : "image/jpeg",
+        extension: preserveTransparency ? ".webp" : ".jpg",
       }
     }
 

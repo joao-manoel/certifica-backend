@@ -60,6 +60,7 @@ model User {
   apiClients ApiClient[]
   auditLogs  AuditLog[]
   media             Media[]
+  mediaVersions     MediaVersion[]
   portfolioProjects PortfolioProject[]
 
   @@index([role, isActive])
@@ -288,11 +289,15 @@ model MediaVersion {
   height        Int
   fileSizeBytes Int
   dominantClr   String?  @db.VarChar(12)
+  operation     Json?
+  createdById   String?
+  createdBy     User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
   isCurrent     Boolean  @default(false)
   createdAt     DateTime @default(now())
 
   @@index([mediaId, createdAt])
   @@index([mediaId, isCurrent])
+  @@index([createdById])
 }
 
 model PortfolioProject {
